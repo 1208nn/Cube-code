@@ -1,7 +1,7 @@
 {
   "name": "cube",
-  "displayName": "Cube",
-  "description": "Manage your Cube OSS",
+  "displayName": "精弘 Cube 对象存储",
+  "description": "Manage your Cube OSS in your code.",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.125.0"
@@ -18,12 +18,12 @@
         "cube.apiUrl": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Cube OSS 后端地址（例如 `https://oss.example.com/`）。`/api`、`/files`、`/thumbnails` 端点都基于此地址解析。"
+          "markdownDescription": "Cube OSS 后端地址。"
         },
         "cube.downloadDirectory": {
           "type": "string",
           "default": "",
-          "markdownDescription": "下载默认目录（绝对路径，例如 `C:/Users/you/Downloads`）。留空 = 第一个已打开的工作区文件夹，再退化为系统默认。"
+          "markdownDescription": "默认下载目录。"
         },
         "cube.webpConvertible": {
           "type": "array",
@@ -39,17 +39,17 @@
             ".tiff",
             ".bmp"
           ],
-          "markdownDescription": "开启 WebP 转换时，仅这些扩展名的图片会被转换。可在此声明式增删支持的格式（例如新增 `.webp`）。"
+          "markdownDescription": "开启 WebP 转换时，仅这些扩展名的图片会被转换。"
         },
         "cube.convertWebp": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "开启后，上传时白名单内的图片会转换为 WebP（见 `cube.webpConvertible`）。"
+          "markdownDescription": "开启后，上传时白名单内的图片会转换为 WebP。"
         },
         "cube.useUuid": {
           "type": "boolean",
           "default": false,
-          "markdownDescription": "开启后，上传文件会使用 UUID 重命名（不保留原文件名）。"
+          "markdownDescription": "开启后，上传文件会使用 UUID 重命名。"
         }
       }
     },
@@ -66,6 +66,7 @@
       "cube": [
         {
           "id": "cubeExplorer",
+          "icon": "media/cube.svg",
           "name": "资源管理器",
           "contextualTitle": "Cube OSS"
         }
@@ -122,7 +123,7 @@
       },
       {
         "command": "cube.openSettings",
-        "title": "更多设置",
+        "title": "更多设置...",
         "category": "Cube"
       },
       {
