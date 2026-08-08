@@ -41,40 +41,28 @@ export interface CommandDeps {
 	context: vscode.ExtensionContext;
 	client: CubeClient;
 	tree: CubeTreeProvider;
+	prefs: UploadPrefs;
 }
 
-interface UploadOptions {
+interface UploadPrefs {
 	convertWebp: boolean;
 	useUuid: boolean;
 }
 
-/** Ask for upload options; undefined = user cancelled. */
-async function pickUploadOptions(): Promise<UploadOptions | undefined> {
-	interface OptionItem extends vscode.QuickPickItem {
-		id: keyof UploadOptions;
-	}
-	const picks = await vscode.window.showQuickPick<OptionItem>(
-		[
-			{ id: 'convertWebp', label: '转换为 WebP', description: 'convert_webp' },
-			{ id: 'useUuid', label: '使用 UUID 重命名（不保留原文件名）', description: 'use_uuid' },
-		],
-		{
-			canPickMany: true,
-			title: 'Cube: 上传选项',
-			placeHolder: '直接 Enter 使用默认：保留原文件名，不转换 WebP',
-		},
-	);
-	if (picks === undefined) {
-		return undefined;
-	}
-	return {
-		convertWebp: picks.some((p) => p.id === 'convertWebp'),
-		useUuid: picks.some((p) => p.id === 'useUuid'),
-	};
+/** Extensions the backend can convert to WebP (others are left untouched). */
+const WEBP_CONVERTIBLE = /\.(png|jpe?g)$/i;
+
+function isConvertible(name: string): boolean {
+	return WEBP_CONVERTIBLE.test(name);
+}
+
+async function setPrefContext(prefs: UploadPrefs): Promise<void> {
+	await vscode.commands.executeCommand('setContext', 'cube.convertWebp', prefs.convertWebp);
+	await vscode.commands.executeCommand('setContext', 'cube.useUuid', prefs.useUuid);
 }
 
 export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
-	const { context, client, tree } = deps;
+	const { context, client, tree, prefs } = deps;
 
 	const reg = (name: string, fn: CommandFn) =>
 		vscode.commands.registerCommand(name, runSafely(fn));
@@ -89,7 +77,6 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
 		bucket: string,
 		location: string,
 		uris: vscode.Uri[],
-		opts: UploadOptions,
 	): Promise<void> => {
 		await vscode.window.withProgress(
 			{
@@ -103,7 +90,10 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
 					const name = uri.path.split('/').pop() ?? 'file';
 					progress.report({ message: name });
 					const data = await vscode.workspace.fs.readFile(uri);
-					await client.upload(bucket, location, name, data, opts);
+					await client.upload(bucket, location, name, data, {
+						convertWebp: prefs.convertWebp && isConvertible(name),
+						useUuid: prefs.useUuid,
+					});
 					progress.report({ increment: step });
 				}
 			},
@@ -160,6 +150,22 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
 			tree.refresh();
 		}),
 
+		reg('cube.toggleConvertWebp', async () => {
+			prefs.convertWebp = !prefs.convertWebp;
+			await setPrefContext(prefs);
+			await vscode.window.showInformationMessage(
+				`Cube: WebP 转换已${prefs.convertWebp ? '开启' : '关闭'}（对 png/jpg/jpeg 生效）`,
+			);
+		}),
+
+		reg('cube.toggleUseUuid', async () => {
+			prefs.useUuid = !prefs.useUuid;
+			await setPrefContext(prefs);
+			await vscode.window.showInformationMessage(
+				`Cube: UUID 重命名已${prefs.useUuid ? '开启' : '关闭'}`,
+			);
+		}),
+
 		reg('cube.uploadFile', async (node?: CubeNode) => {
 			let bucket: string | undefined;
 			let location = '';
@@ -173,16 +179,12 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
 				return;
 			}
 
-			const uris = await pickLocalFiles(`Upload to ${bucket}${location ? '/' + location : ''}`);
-			if (!uris?.length) {
-				return;
-			}
-			const opts = await pickUploadOptions();
-			if (!opts) {
-				return;
-			}
-			await uploadFiles(bucket, location, uris, opts);
-		}),
+		const uris = await pickLocalFiles(`Upload to ${bucket}${location ? '/' + location : ''}`);
+		if (!uris?.length) {
+			return;
+		}
+		await uploadFiles(bucket, location, uris);
+	}),
 
 		// Folders materialize on upload (backend has no explicit mkdir): the command
 		// asks for a folder name, then uploads chosen files into that location.
@@ -217,16 +219,12 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
 			}
 			const location = base ? `${base}/${name.trim()}` : name.trim();
 
-			const uris = await pickLocalFiles(`Upload into new folder ${bucket}/${location}`);
-			if (!uris?.length) {
-				return;
-			}
-			const opts = await pickUploadOptions();
-			if (!opts) {
-				return;
-			}
-			await uploadFiles(bucket, location, uris, opts);
-		}),
+		const uris = await pickLocalFiles(`Upload into new folder ${bucket}/${location}`);
+		if (!uris?.length) {
+			return;
+		}
+		await uploadFiles(bucket, location, uris);
+	}),
 
 		reg('cube.downloadFile', async (node: CubeNode) => {
 			if (node?.kind !== 'file') {

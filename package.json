@@ -75,6 +75,16 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "cube.toggleConvertWebp",
+        "title": "Toggle WebP Conversion",
+        "category": "Cube"
+      },
+      {
+        "command": "cube.toggleUseUuid",
+        "title": "Toggle UUID Rename",
+        "category": "Cube"
+      },
+      {
         "command": "cube.uploadFile",
         "title": "Upload File...",
         "category": "Cube",
@@ -132,6 +142,34 @@
           "command": "cube.newFolder",
           "when": "view == cubeExplorer",
           "group": "navigation"
+        },
+        {
+          "command": "cube.toggleConvertWebp",
+          "when": "view == cubeExplorer && cube.convertWebp",
+          "group": "1_toggles",
+          "title": "$(check) WebP: ON",
+          "icon": "$(check)"
+        },
+        {
+          "command": "cube.toggleConvertWebp",
+          "when": "view == cubeExplorer && !cube.convertWebp",
+          "group": "1_toggles",
+          "title": "$(circle-large-outline) WebP: OFF",
+          "icon": "$(circle-large-outline)"
+        },
+        {
+          "command": "cube.toggleUseUuid",
+          "when": "view == cubeExplorer && cube.useUuid",
+          "group": "1_toggles",
+          "title": "$(check) UUID: ON",
+          "icon": "$(check)"
+        },
+        {
+          "command": "cube.toggleUseUuid",
+          "when": "view == cubeExplorer && !cube.useUuid",
+          "group": "1_toggles",
+          "title": "$(circle-large-outline) UUID: OFF",
+          "icon": "$(circle-large-outline)"
         },
         {
           "command": "cube.setApiKey",

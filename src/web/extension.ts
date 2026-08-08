@@ -8,6 +8,10 @@ import { CubeDragDropController, CubeTreeProvider } from './tree';
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
 	const client = new CubeClient(getApiUrl, () => getApiKey(context));
 
+	const prefs = { convertWebp: true, useUuid: false };
+	await vscode.commands.executeCommand('setContext', 'cube.convertWebp', prefs.convertWebp);
+	await vscode.commands.executeCommand('setContext', 'cube.useUuid', prefs.useUuid);
+
 	const tree = new CubeTreeProvider(client, async () => !!(await getApiKey(context)));
 	const dragDrop = new CubeDragDropController(client, tree);
 	const fsProvider = new CubeFileSystemProvider(client, (bucket, location) =>
@@ -21,7 +25,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 			dragAndDropController: dragDrop,
 		}),
 		vscode.workspace.registerFileSystemProvider('cube', fsProvider, { isCaseSensitive: true }),
-		...registerCommands({ context, client, tree }),
+		...registerCommands({ context, client, tree, prefs }),
 		context.secrets.onDidChange(() => {
 			void updateContextKeys(context).then(() => tree.refresh());
 		}),
