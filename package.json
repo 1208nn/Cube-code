@@ -1,0 +1,197 @@
+{
+  "name": "cube",
+  "displayName": "Cube",
+  "description": "Manage your Cube OSS",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.125.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "browser": "./dist/web/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "Cube OSS",
+      "properties": {
+        "cube.apiUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Base URL of the Cube OSS backend (e.g. https://oss.example.com)"
+        }
+      }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "cube",
+          "title": "Cube OSS",
+          "icon": "media/cube.svg"
+        }
+      ]
+    },
+    "views": {
+      "cube": [
+        {
+          "id": "cubeExplorer",
+          "name": "Explorer",
+          "contextualTitle": "Cube OSS"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "cubeExplorer",
+        "contents": "Connect to your Cube OSS backend.\n[Set API URL](command:cube.setApiUrl)\n[Set API Key](command:cube.setApiKey)",
+        "when": "!cube.hasApiKey"
+      }
+    ],
+    "commands": [
+      {
+        "command": "cube.setApiKey",
+        "title": "Set API Key",
+        "category": "Cube"
+      },
+      {
+        "command": "cube.setApiUrl",
+        "title": "Set API URL",
+        "category": "Cube"
+      },
+      {
+        "command": "cube.clearApiKey",
+        "title": "Clear API Key",
+        "category": "Cube"
+      },
+      {
+        "command": "cube.refresh",
+        "title": "Refresh",
+        "category": "Cube",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "cube.uploadFile",
+        "title": "Upload File...",
+        "category": "Cube",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "cube.downloadFile",
+        "title": "Download",
+        "category": "Cube",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "cube.deleteFile",
+        "title": "Delete",
+        "category": "Cube",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "cube.copyFileUrl",
+        "title": "Copy File URL",
+        "category": "Cube",
+        "icon": "$(link)"
+      },
+      {
+        "command": "cube.openFile",
+        "title": "Open File",
+        "category": "Cube"
+      },
+      {
+        "command": "cube.previewImage",
+        "title": "Preview Image",
+        "category": "Cube",
+        "icon": "$(eye)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "cube.refresh",
+          "when": "view == cubeExplorer",
+          "group": "navigation"
+        },
+        {
+          "command": "cube.uploadFile",
+          "when": "view == cubeExplorer",
+          "group": "navigation"
+        },
+        {
+          "command": "cube.setApiKey",
+          "when": "view == cubeExplorer",
+          "group": "1_settings"
+        },
+        {
+          "command": "cube.setApiUrl",
+          "when": "view == cubeExplorer",
+          "group": "1_settings"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "cube.uploadFile",
+          "when": "view == cubeExplorer && viewItem =~ /^(bucket|folder)$/",
+          "group": "1_modification"
+        },
+        {
+          "command": "cube.openFile",
+          "when": "view == cubeExplorer && viewItem =~ /^(file|image)$/",
+          "group": "inline"
+        },
+        {
+          "command": "cube.previewImage",
+          "when": "view == cubeExplorer && viewItem == image",
+          "group": "inline"
+        },
+        {
+          "command": "cube.downloadFile",
+          "when": "view == cubeExplorer && viewItem =~ /^(file|image)$/",
+          "group": "2_action"
+        },
+        {
+          "command": "cube.copyFileUrl",
+          "when": "view == cubeExplorer && viewItem =~ /^(file|image)$/",
+          "group": "2_action"
+        },
+        {
+          "command": "cube.deleteFile",
+          "when": "view == cubeExplorer && viewItem =~ /^(file|image)$/",
+          "group": "3_delete"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "test": "vscode-test-web --browserType=chromium --extensionDevelopmentPath=. --extensionTestsPath=dist/web/test/suite/extensionTests.js",
+    "pretest": "pnpm run compile-web",
+    "vscode:prepublish": "pnpm run package-web",
+    "compile-web": "pnpm run check-types && pnpm run lint && node esbuild.js",
+    "watch-web": "npm-run-all -p watch-web:*",
+    "watch-web:esbuild": "node esbuild.js --watch",
+    "watch-web:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "package-web": "pnpm run check-types && pnpm run lint && node esbuild.js --production",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src",
+    "run-in-browser": "vscode-test-web --browserType=chromium --extensionDevelopmentPath=. ."
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.125.0",
+    "@types/mocha": "^10.0.10",
+    "@types/assert": "^1.5.11",
+    "eslint": "^10.5.0",
+    "typescript-eslint": "^8.61.1",
+    "mocha": "^11.7.6",
+    "typescript": "^6.0.3",
+    "@vscode/test-web": "^0.0.81",
+    "esbuild": "^0.28.1",
+    "glob": "^13.0.6",
+    "npm-run-all": "^4.1.5",
+    "@esbuild-plugins/node-globals-polyfill": "^0.2.3",
+    "assert": "^2.1.0"
+  },
+  "overrides": {
+    "diff": "^8.0.4",
+    "serialize-javascript": "^7.0.6"
+  }
+}
