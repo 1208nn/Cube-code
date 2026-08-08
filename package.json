@@ -30,6 +30,16 @@
           "items": { "type": "string" },
           "default": [".jpg", ".jpeg", ".png", ".gif", ".tif", ".tiff", ".bmp"],
           "markdownDescription": "开启 WebP 转换时，仅这些扩展名的图片会被转换。可在此声明式增删支持的格式（例如新增 `.webp`）。"
+        },
+        "cube.convertWebp": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "开启后，上传时白名单内的图片会转换为 WebP（见 `cube.webpConvertible`）。"
+        },
+        "cube.useUuid": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "开启后，上传文件会使用 UUID 重命名（不保留原文件名）。"
         }
       }
     },
@@ -81,13 +91,28 @@
         "icon": "$(refresh)"
       },
       {
-        "command": "cube.toggleConvertWebp",
-        "title": "WebP 转换开关",
+        "command": "cube.setFilenameKeep",
+        "title": "保留文件名",
         "category": "Cube"
       },
       {
-        "command": "cube.toggleUseUuid",
-        "title": "UUID 重命名开关",
+        "command": "cube.setFilenameRandom",
+        "title": "开启随机文件名",
+        "category": "Cube"
+      },
+      {
+        "command": "cube.setFormatWebp",
+        "title": "转换为 WebP",
+        "category": "Cube"
+      },
+      {
+        "command": "cube.setFormatKeep",
+        "title": "保留原格式",
+        "category": "Cube"
+      },
+      {
+        "command": "cube.openSettings",
+        "title": "更多设置",
         "category": "Cube"
       },
       {
@@ -150,42 +175,44 @@
           "group": "navigation"
         },
         {
-          "command": "cube.toggleConvertWebp",
-          "when": "view == cubeExplorer && cube.convertWebp",
-          "group": "1_toggles",
-          "title": "$(check) WebP: ON",
-          "icon": "$(check)"
-        },
-        {
-          "command": "cube.toggleConvertWebp",
-          "when": "view == cubeExplorer && !cube.convertWebp",
-          "group": "1_toggles",
-          "title": "$(circle-large-outline) WebP: OFF",
-          "icon": "$(circle-large-outline)"
-        },
-        {
-          "command": "cube.toggleUseUuid",
+          "command": "cube.setFilenameKeep",
           "when": "view == cubeExplorer && cube.useUuid",
-          "group": "1_toggles",
-          "title": "$(check) UUID: ON",
-          "icon": "$(check)"
+          "group": "2_options@1",
+          "title": "保留文件名"
         },
         {
-          "command": "cube.toggleUseUuid",
+          "command": "cube.setFilenameRandom",
           "when": "view == cubeExplorer && !cube.useUuid",
-          "group": "1_toggles",
-          "title": "$(circle-large-outline) UUID: OFF",
-          "icon": "$(circle-large-outline)"
+          "group": "2_options@1",
+          "title": "开启随机文件名"
+        },
+        {
+          "command": "cube.setFormatWebp",
+          "when": "view == cubeExplorer && !cube.convertWebp",
+          "group": "2_options@2",
+          "title": "转换为 WebP"
+        },
+        {
+          "command": "cube.setFormatKeep",
+          "when": "view == cubeExplorer && cube.convertWebp",
+          "group": "2_options@2",
+          "title": "保留原格式"
         },
         {
           "command": "cube.setApiKey",
           "when": "view == cubeExplorer",
-          "group": "1_settings"
+          "group": "8_settings"
         },
         {
           "command": "cube.setApiUrl",
           "when": "view == cubeExplorer",
-          "group": "1_settings"
+          "group": "8_settings"
+        },
+        {
+          "command": "cube.openSettings",
+          "when": "view == cubeExplorer",
+          "group": "9_more",
+          "title": "更多设置..."
         }
       ],
       "view/item/context": [

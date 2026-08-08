@@ -41,12 +41,14 @@ export interface CommandDeps {
 	context: vscode.ExtensionContext;
 	client: CubeClient;
 	tree: CubeTreeProvider;
-	prefs: UploadPrefs;
 }
 
-interface UploadPrefs {
-	convertWebp: boolean;
-	useUuid: boolean;
+function getPrefs(): { convertWebp: boolean; useUuid: boolean } {
+	const cfg = vscode.workspace.getConfiguration('cube');
+	return {
+		convertWebp: cfg.get<boolean>('convertWebp', true),
+		useUuid: cfg.get<boolean>('useUuid', false),
+	};
 }
 
 /** Build a case-insensitive regex from the configurable `cube.webpConvertible` list. */
@@ -61,16 +63,29 @@ function webpConvertibleRegex(): RegExp {
 	return new RegExp(`(${parts.join('|')})$`, 'i');
 }
 
-async function setPrefContext(prefs: UploadPrefs): Promise<void> {
-	await vscode.commands.executeCommand('setContext', 'cube.convertWebp', prefs.convertWebp);
-	await vscode.commands.executeCommand('setContext', 'cube.useUuid', prefs.useUuid);
-}
-
 export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
-	const { context, client, tree, prefs } = deps;
+	const { context, client, tree } = deps;
 
 	const reg = (name: string, fn: CommandFn) =>
 		vscode.commands.registerCommand(name, runSafely(fn));
+
+	// Reflect config into context keys so the title-bar toggle items show the current mode.
+	function syncContextKeys(): void {
+		const { convertWebp, useUuid } = getPrefs();
+		void vscode.commands.executeCommand('setContext', 'cube.useUuid', useUuid);
+		void vscode.commands.executeCommand('setContext', 'cube.convertWebp', convertWebp);
+	}
+	syncContextKeys();
+	context.subscriptions.push(
+		vscode.workspace.onDidChangeConfiguration((e) => {
+			if (
+				e.affectsConfiguration('cube.convertWebp') ||
+				e.affectsConfiguration('cube.useUuid')
+			) {
+				syncContextKeys();
+			}
+		}),
+	);
 
 	const pickBucket = async (): Promise<string | undefined> => {
 		const buckets = await client.listBuckets();
@@ -91,13 +106,15 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
 			},
 			async (progress) => {
 				const step = 100 / uris.length;
+				const { convertWebp, useUuid } = getPrefs();
+				const regex = webpConvertibleRegex();
 				for (const uri of uris) {
 					const name = uri.path.split('/').pop() ?? 'file';
 					progress.report({ message: name });
 					const data = await vscode.workspace.fs.readFile(uri);
 					await client.upload(bucket, location, name, data, {
-						convertWebp: prefs.convertWebp && webpConvertibleRegex().test(name),
-						useUuid: prefs.useUuid,
+						convertWebp: convertWebp && regex.test(name),
+						useUuid,
 					});
 					progress.report({ increment: step });
 				}
@@ -109,8 +126,15 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
 			);
 		};
 
-		const pickLocalFiles = (title: string) =>
-			vscode.window.showOpenDialog({ canSelectMany: true, openLabel: '上传', title });
+	const pickLocalFiles = (title: string) =>
+		vscode.window.showOpenDialog({ canSelectMany: true, openLabel: '上传', title });
+
+	const setBool = async (key: string, value: boolean): Promise<void> => {
+		await vscode.workspace
+			.getConfiguration('cube')
+			.update(key, value, vscode.ConfigurationTarget.Global);
+		syncContextKeys();
+	};
 
 	return [
 		reg('cube.setApiKey', async () => {
@@ -155,19 +179,28 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
 			tree.refresh();
 		}),
 
-		reg('cube.toggleConvertWebp', async () => {
-			prefs.convertWebp = !prefs.convertWebp;
-			await setPrefContext(prefs);
-			await vscode.window.showInformationMessage(
-				`Cube：WebP 转换已${prefs.convertWebp ? '开启' : '关闭'}（按图片白名单生效）`,
-			);
+		// Menu label = the ACTION performed; the matching `when` shows it only while
+		// the opposite mode is active, so clicking switches and the menu re-renders.
+		reg('cube.setFilenameKeep', async () => {
+			await setBool('useUuid', false);
 		}),
 
-		reg('cube.toggleUseUuid', async () => {
-			prefs.useUuid = !prefs.useUuid;
-			await setPrefContext(prefs);
-			await vscode.window.showInformationMessage(
-				`Cube：UUID 重命名已${prefs.useUuid ? '开启' : '关闭'}`,
+		reg('cube.setFilenameRandom', async () => {
+			await setBool('useUuid', true);
+		}),
+
+		reg('cube.setFormatWebp', async () => {
+			await setBool('convertWebp', true);
+		}),
+
+		reg('cube.setFormatKeep', async () => {
+			await setBool('convertWebp', false);
+		}),
+
+		reg('cube.openSettings', async () => {
+			await vscode.commands.executeCommand(
+				'workbench.action.openSettings',
+				`@ext:${context.extension.id}`,
 			);
 		}),
 
