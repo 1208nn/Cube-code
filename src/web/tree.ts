@@ -128,3 +128,91 @@ function formatSize(bytes: number): string {
 	}
 	return `${size.toFixed(1)} ${units[i]}`;
 }
+
+/** Handles OS / Explorer file drops onto bucket or folder nodes → upload. */
+export class CubeDragDropController implements vscode.TreeDragAndDropController<CubeNode> {
+	readonly dragMimeTypes: readonly string[] = [];
+	readonly dropMimeTypes: readonly string[] = ['text/uri-list', 'files'];
+
+	constructor(
+		private readonly client: CubeClient,
+		private readonly tree: CubeTreeProvider,
+	) {}
+
+	async handleDrop(
+		target: CubeNode | undefined,
+		dataTransfer: vscode.DataTransfer,
+		token: vscode.CancellationToken,
+	): Promise<void> {
+		if (!target || target.kind === 'file') {
+			await vscode.window.showWarningMessage('Cube: drop files onto a bucket or folder to upload.');
+			return;
+		}
+		const bucket = target.bucket;
+		const location = target.kind === 'dir' ? target.path.replace(/\/$/, '') : '';
+
+		interface DroppedFile {
+			name: string;
+			read: () => Promise<Uint8Array>;
+		}
+		const files: DroppedFile[] = [];
+
+		// From VS Code Explorer / desktop (uri-list)
+		const uriItem = dataTransfer.get('text/uri-list');
+		if (uriItem) {
+			const text = await uriItem.asString();
+			for (const line of text.split(/\r?\n/)) {
+				const trimmed = line.trim();
+				if (!trimmed || trimmed.startsWith('#')) {
+					continue;
+				}
+				const uri = vscode.Uri.parse(trimmed);
+				if (uri.scheme === 'file' || uri.scheme === 'vscode-remote') {
+					files.push({
+						name: uri.path.split('/').pop() ?? 'file',
+						read: async () => vscode.workspace.fs.readFile(uri),
+					});
+				}
+			}
+		}
+
+		// From OS into a web extension host (browser File objects)
+		for (const [, item] of dataTransfer) {
+			const file = item.asFile();
+			if (file) {
+				files.push({ name: file.name, read: async () => file.data() });
+			}
+		}
+
+		if (!files.length) {
+			return;
+		}
+
+		await vscode.window.withProgress(
+			{
+				location: vscode.ProgressLocation.Notification,
+				title: `Cube: uploading to ${bucket}${location ? '/' + location : ''}`,
+				cancellable: false,
+			},
+			async (progress) => {
+				let done = 0;
+				for (const file of files) {
+					if (token.isCancellationRequested) {
+						break;
+					}
+					progress.report({ message: file.name, increment: 100 / files.length });
+					const data = await file.read();
+					await this.client.upload(bucket, location, file.name, data, {
+						convertWebp: false,
+						useUuid: false,
+					});
+					done++;
+				}
+			},
+		);
+		this.tree.invalidate(bucket, location);
+		await vscode.window.showInformationMessage(
+			`Cube: uploaded ${files.length} file(s) to ${bucket}${location ? '/' + location : ''}.`,
+		);
+	}
+}
