@@ -13,24 +13,24 @@ function runSafely(fn: CommandFn): CommandFn {
 		} catch (e) {
 			if (e instanceof AuthError) {
 				const pick = await vscode.window.showErrorMessage(
-					'Cube: invalid or missing API key.',
-					'Set API Key',
+					'Cube：API Key 无效或缺失。',
+					'设置 API Key',
 				);
 				if (pick) {
 					await vscode.commands.executeCommand('cube.setApiKey');
 				}
 			} else if (e instanceof ConfigError) {
 				const pick = await vscode.window.showErrorMessage(
-					`Cube: ${e.message}`,
-					'Configure API URL',
+					`Cube：${e.message}`,
+					'配置 API 地址',
 				);
 				if (pick) {
 					await vscode.commands.executeCommand('cube.setApiUrl');
 				}
 			} else if (e instanceof ApiError) {
-				await vscode.window.showErrorMessage(`Cube: ${e.message}`);
+				await vscode.window.showErrorMessage(`Cube：${e.message}`);
 			} else {
-				await vscode.window.showErrorMessage(`Cube: ${e instanceof Error ? e.message : String(e)}`);
+				await vscode.window.showErrorMessage(`Cube：${e instanceof Error ? e.message : String(e)}`);
 			}
 			return undefined;
 		}
@@ -49,11 +49,16 @@ interface UploadPrefs {
 	useUuid: boolean;
 }
 
-/** Extensions the backend can convert to WebP (others are left untouched). */
-const WEBP_CONVERTIBLE = /\.(png|jpe?g)$/i;
-
-function isConvertible(name: string): boolean {
-	return WEBP_CONVERTIBLE.test(name);
+/** Build a case-insensitive regex from the configurable `cube.webpConvertible` list. */
+function webpConvertibleRegex(): RegExp {
+	const exts =
+		vscode.workspace.getConfiguration('cube').get<string[]>('webpConvertible') ??
+		['.jpg', '.jpeg', '.png', '.gif', '.tif', '.tiff', '.bmp'];
+	const parts = exts
+		.map((e) => e.trim().toLowerCase())
+		.map((e) => (e.startsWith('.') ? e : '.' + e))
+		.map((e) => e.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+	return new RegExp(`(${parts.join('|')})$`, 'i');
 }
 
 async function setPrefContext(prefs: UploadPrefs): Promise<void> {
@@ -69,7 +74,7 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
 
 	const pickBucket = async (): Promise<string | undefined> => {
 		const buckets = await client.listBuckets();
-		return vscode.window.showQuickPick(buckets, { title: 'Cube: 选择 bucket' });
+		return vscode.window.showQuickPick(buckets, { title: 'Cube：选择 bucket' });
 	};
 
 	/** Upload local files into bucket/location with progress. */
@@ -91,27 +96,27 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
 					progress.report({ message: name });
 					const data = await vscode.workspace.fs.readFile(uri);
 					await client.upload(bucket, location, name, data, {
-						convertWebp: prefs.convertWebp && isConvertible(name),
+						convertWebp: prefs.convertWebp && webpConvertibleRegex().test(name),
 						useUuid: prefs.useUuid,
 					});
 					progress.report({ increment: step });
 				}
 			},
 		);
-		tree.invalidate(bucket, location);
-		await vscode.window.showInformationMessage(
-			`Cube: uploaded ${uris.length} file(s) to ${bucket}${location ? '/' + location : ''}.`,
-		);
-	};
+			tree.invalidate(bucket, location);
+			await vscode.window.showInformationMessage(
+				`Cube：已上传 ${uris.length} 个文件到 ${bucket}${location ? '/' + location : ''}。`,
+			);
+		};
 
-	const pickLocalFiles = (title: string) =>
-		vscode.window.showOpenDialog({ canSelectMany: true, openLabel: 'Upload', title });
+		const pickLocalFiles = (title: string) =>
+			vscode.window.showOpenDialog({ canSelectMany: true, openLabel: '上传', title });
 
 	return [
 		reg('cube.setApiKey', async () => {
 			const key = await vscode.window.showInputBox({
-				title: 'Cube: Set API Key',
-				prompt: 'Enter the API key for your Cube OSS backend',
+				title: 'Cube：设置 API Key',
+				prompt: '输入你的 Cube OSS 后端 API Key',
 				password: true,
 				ignoreFocusOut: true,
 			});
@@ -120,19 +125,19 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
 			}
 			await setApiKey(context, key.trim());
 			tree.refresh();
-			await vscode.window.showInformationMessage('Cube: API key saved.');
+			await vscode.window.showInformationMessage('Cube：已保存 API Key。');
 		}),
 
 		reg('cube.clearApiKey', async () => {
 			await clearApiKey(context);
 			tree.refresh();
-			await vscode.window.showInformationMessage('Cube: API key cleared.');
+			await vscode.window.showInformationMessage('Cube：已清除 API Key。');
 		}),
 
 		reg('cube.setApiUrl', async () => {
 			const url = await vscode.window.showInputBox({
-				title: 'Cube: Set API URL',
-				prompt: 'Base URL of the Cube OSS backend, e.g. https://oss.example.com',
+				title: 'Cube：设置 API 地址',
+				prompt: 'Cube OSS 后端地址，例如 https://oss.example.com',
 				value: getApiUrl(),
 				ignoreFocusOut: true,
 			});
@@ -143,7 +148,7 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
 				.getConfiguration('cube')
 				.update('apiUrl', url.trim(), vscode.ConfigurationTarget.Global);
 			tree.refresh();
-			await vscode.window.showInformationMessage('Cube: API URL saved.');
+			await vscode.window.showInformationMessage('Cube：已保存 API 地址。');
 		}),
 
 		reg('cube.refresh', async () => {
@@ -154,7 +159,7 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
 			prefs.convertWebp = !prefs.convertWebp;
 			await setPrefContext(prefs);
 			await vscode.window.showInformationMessage(
-				`Cube: WebP 转换已${prefs.convertWebp ? '开启' : '关闭'}（对 png/jpg/jpeg 生效）`,
+				`Cube：WebP 转换已${prefs.convertWebp ? '开启' : '关闭'}（按图片白名单生效）`,
 			);
 		}),
 
@@ -162,7 +167,7 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
 			prefs.useUuid = !prefs.useUuid;
 			await setPrefContext(prefs);
 			await vscode.window.showInformationMessage(
-				`Cube: UUID 重命名已${prefs.useUuid ? '开启' : '关闭'}`,
+				`Cube：UUID 重命名已${prefs.useUuid ? '开启' : '关闭'}`,
 			);
 		}),
 
@@ -179,12 +184,12 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
 				return;
 			}
 
-		const uris = await pickLocalFiles(`Upload to ${bucket}${location ? '/' + location : ''}`);
-		if (!uris?.length) {
-			return;
-		}
-		await uploadFiles(bucket, location, uris);
-	}),
+			const uris = await pickLocalFiles(`上传到 ${bucket}${location ? '/' + location : ''}`);
+			if (!uris?.length) {
+				return;
+			}
+			await uploadFiles(bucket, location, uris);
+		}),
 
 		// Folders materialize on upload (backend has no explicit mkdir): the command
 		// asks for a folder name, then uploads chosen files into that location.
@@ -202,7 +207,7 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
 			}
 
 			const name = await vscode.window.showInputBox({
-				title: 'Cube: New Folder',
+				title: 'Cube：新建文件夹',
 				prompt: `在 ${bucket}/${base ? base + '/' : ''} 下新建文件夹（文件夹随上传的文件一起创建）`,
 				validateInput: (v) => {
 					if (!v.trim()) {
@@ -219,12 +224,12 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
 			}
 			const location = base ? `${base}/${name.trim()}` : name.trim();
 
-		const uris = await pickLocalFiles(`Upload into new folder ${bucket}/${location}`);
-		if (!uris?.length) {
-			return;
-		}
-		await uploadFiles(bucket, location, uris);
-	}),
+			const uris = await pickLocalFiles(`上传到新文件夹 ${bucket}/${location}`);
+			if (!uris?.length) {
+				return;
+			}
+			await uploadFiles(bucket, location, uris);
+		}),
 
 		reg('cube.downloadFile', async (node: CubeNode) => {
 			if (node?.kind !== 'file') {
@@ -240,7 +245,7 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
 			await vscode.window.withProgress(
 				{
 					location: vscode.ProgressLocation.Notification,
-					title: `Cube: downloading ${node.meta.name}`,
+					title: `Cube：正在下载 ${node.meta.name}`,
 					cancellable: false,
 				},
 				async () => {
@@ -248,7 +253,7 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
 					await vscode.workspace.fs.writeFile(target, data);
 				},
 			);
-			await vscode.window.showInformationMessage(`Cube: downloaded ${node.meta.name}.`);
+			await vscode.window.showInformationMessage(`Cube：已下载 ${node.meta.name}。`);
 		}),
 
 		reg('cube.deleteFile', async (node: CubeNode) => {
@@ -256,18 +261,18 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
 				return;
 			}
 			const confirm = await vscode.window.showWarningMessage(
-				`Delete "${node.meta.name}" from bucket "${node.bucket}"? This cannot be undone.`,
+				`确定要从 bucket「${node.bucket}」删除「${node.meta.name}」吗？此操作不可撤销。`,
 				{ modal: true },
-				'Delete',
+				'删除',
 			);
-			if (confirm !== 'Delete') {
+			if (confirm !== '删除') {
 				return;
 			}
 			await client.delete(node.bucket, nodeKey(node));
 			const key = nodeKey(node);
 			const location = key.includes('/') ? key.slice(0, key.lastIndexOf('/')) : '';
 			tree.invalidate(node.bucket, location);
-			await vscode.window.showInformationMessage(`Cube: deleted ${node.meta.name}.`);
+			await vscode.window.showInformationMessage(`Cube：已删除 ${node.meta.name}。`);
 		}),
 
 		reg('cube.copyFileUrl', async (node: CubeNode) => {
@@ -275,7 +280,7 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
 				return;
 			}
 			await vscode.env.clipboard.writeText(client.fileUrl(node.bucket, nodeKey(node)));
-			await vscode.window.showInformationMessage('Cube: file URL copied to clipboard.');
+			await vscode.window.showInformationMessage('Cube：文件地址已复制到剪贴板。');
 		}),
 
 		reg('cube.openFile', async (node: CubeNode) => {
