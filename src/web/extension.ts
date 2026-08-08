@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { CubeClient } from './api';
 import { registerCommands } from './commands';
 import { CubeFileSystemProvider } from './fsProvider';
-import { getApiKey, getApiUrl, updateContextKeys } from './state';
+import { getApiKey, getApiUrl, syncToggleContextKeys, updateContextKeys } from './state';
 import { CubeDragDropController, CubeTreeProvider } from './tree';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
@@ -34,6 +34,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	);
 
 	await updateContextKeys(context);
+	// Re-sync toggle context keys now that all contributed menus are registered, so the
+	// title-bar items reflect the saved settings immediately (not only after the first
+	// tree refresh triggered by the bucket list loading).
+	syncToggleContextKeys();
 }
 
 export function deactivate() {}

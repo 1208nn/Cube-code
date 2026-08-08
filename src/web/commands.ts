@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { ApiError, AuthError, ConfigError, CubeClient } from './api';
-import { clearApiKey, getApiUrl, setApiKey } from './state';
+import { clearApiKey, getApiUrl, setApiKey, syncToggleContextKeys } from './state';
 import { CubeNode, CubeTreeProvider, nodeKey, nodeUri } from './tree';
 
 type CommandFn = (...args: any[]) => unknown;
@@ -69,20 +69,14 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
 	const reg = (name: string, fn: CommandFn) =>
 		vscode.commands.registerCommand(name, runSafely(fn));
 
-	// Reflect config into context keys so the title-bar toggle items show the current mode.
-	function syncContextKeys(): void {
-		const { convertWebp, useUuid } = getPrefs();
-		void vscode.commands.executeCommand('setContext', 'cube.useUuid', useUuid);
-		void vscode.commands.executeCommand('setContext', 'cube.convertWebp', convertWebp);
-	}
-	syncContextKeys();
+	// Keep the title-bar toggle items in sync with the upload-mode settings.
 	context.subscriptions.push(
 		vscode.workspace.onDidChangeConfiguration((e) => {
 			if (
 				e.affectsConfiguration('cube.convertWebp') ||
 				e.affectsConfiguration('cube.useUuid')
 			) {
-				syncContextKeys();
+				syncToggleContextKeys();
 			}
 		}),
 	);
@@ -120,11 +114,11 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
 				}
 			},
 		);
-			tree.invalidate(bucket, location);
-			await vscode.window.showInformationMessage(
-				`Cube：已上传 ${uris.length} 个文件到 ${bucket}${location ? '/' + location : ''}。`,
-			);
-		};
+		tree.invalidate(bucket, location);
+		await vscode.window.showInformationMessage(
+			`Cube：已上传 ${uris.length} 个文件到 ${bucket}${location ? '/' + location : ''}。`,
+		);
+	};
 
 	const pickLocalFiles = (title: string) =>
 		vscode.window.showOpenDialog({ canSelectMany: true, openLabel: '上传', title });
@@ -133,7 +127,7 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
 		await vscode.workspace
 			.getConfiguration('cube')
 			.update(key, value, vscode.ConfigurationTarget.Global);
-		syncContextKeys();
+		syncToggleContextKeys();
 	};
 
 	return [

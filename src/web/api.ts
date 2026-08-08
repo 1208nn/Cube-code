@@ -123,7 +123,7 @@ export class CubeClient {
 		try {
 			resp = await fetch(this.fileUrl(bucket, objectKey));
 		} catch (e) {
-			throw new ConfigError(`Network error: ${e instanceof Error ? e.message : String(e)}`);
+			throw new Error(`Network error while downloading: ${e instanceof Error ? e.message : String(e)}`);
 		}
 		if (!resp.ok) {
 			throw new ApiError(`Download failed (HTTP ${resp.status})`, resp.status);

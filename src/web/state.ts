@@ -20,6 +20,19 @@ export function getApiUrl(): string {
 	return vscode.workspace.getConfiguration('cube').get<string>('apiUrl', '');
 }
 
+/**
+ * Push the upload-mode settings into context keys so the view-title toggle items
+ * can show the correct item via `when`. Called both at startup (after menus are
+ * registered) and whenever the settings change.
+ */
+export function syncToggleContextKeys(): void {
+	const cfg = vscode.workspace.getConfiguration('cube');
+	const convertWebp = cfg.get<boolean>('convertWebp', true);
+	const useUuid = cfg.get<boolean>('useUuid', false);
+	void vscode.commands.executeCommand('setContext', 'cube.useUuid', useUuid);
+	void vscode.commands.executeCommand('setContext', 'cube.convertWebp', convertWebp);
+}
+
 export async function updateContextKeys(context: vscode.ExtensionContext): Promise<void> {
 	const key = await context.secrets.get(API_KEY_SECRET);
 	await vscode.commands.executeCommand('setContext', 'cube.hasApiKey', !!key);
