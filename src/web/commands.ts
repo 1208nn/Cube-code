@@ -51,17 +51,17 @@ export interface CommandDeps {
 }
 
 function getPrefs(): { convertWebp: boolean; useUuid: boolean } {
-  const cfg = vscode.workspace.getConfiguration("cube");
+  const cfg = vscode.workspace.getConfiguration("cube-oss");
   return {
     convertWebp: cfg.get<boolean>("convertWebp", true),
     useUuid: cfg.get<boolean>("useUuid", false),
   };
 }
 
-/** Build a case-insensitive regex from the configurable `cube.webpConvertible` list. */
+/** Build a case-insensitive regex from the configurable `cube-oss.webpConvertible` list. */
 function webpConvertibleRegex(): RegExp {
   const exts = vscode.workspace
-    .getConfiguration("cube")
+    .getConfiguration("cube-oss")
     .get<string[]>("webpConvertible") ?? [
     ".jpg",
     ".jpeg",
@@ -88,8 +88,8 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (
-        e.affectsConfiguration("cube.convertWebp") ||
-        e.affectsConfiguration("cube.useUuid")
+        e.affectsConfiguration("cube-oss.convertWebp") ||
+        e.affectsConfiguration("cube-oss.useUuid")
       ) {
         syncToggleContextKeys();
       }
@@ -144,7 +144,7 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
 
   const setBool = async (key: string, value: boolean): Promise<void> => {
     await vscode.workspace
-      .getConfiguration("cube")
+      .getConfiguration("cube-oss")
       .update(key, value, vscode.ConfigurationTarget.Global);
     syncToggleContextKeys();
   };
@@ -182,7 +182,7 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
         return;
       }
       await vscode.workspace
-        .getConfiguration("cube")
+        .getConfiguration("cube-oss")
         .update("apiUrl", url.trim(), vscode.ConfigurationTarget.Global);
       tree.refresh();
       await vscode.window.showInformationMessage("Cube：已保存 API 地址。");
@@ -373,13 +373,13 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
 }
 
 /**
- * Default download target: configured `cube.downloadDirectory` first (web
+ * Default download target: configured `cube-oss.downloadDirectory` first (web
  * extensions cannot resolve the OS home dir, so set it to e.g.
  * `C:/Users/you/Downloads`), then the first workspace folder.
  */
 function defaultDownloadUri(name: string): vscode.Uri {
   const dir = vscode.workspace
-    .getConfiguration("cube")
+    .getConfiguration("cube-oss")
     .get<string>("downloadDirectory", "")
     .trim();
   if (dir) {

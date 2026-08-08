@@ -38,7 +38,7 @@ export async function activate(
       void updateContextKeys(context).then(() => tree.refresh());
     }),
     vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration("cube.apiUrl")) {
+      if (e.affectsConfiguration("cube-oss.apiUrl")) {
         fsProvider.invalidateAll();
         tree.refresh();
       }

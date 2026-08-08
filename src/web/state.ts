@@ -24,7 +24,7 @@ export async function clearApiKey(
 }
 
 export function getApiUrl(): string {
-  return vscode.workspace.getConfiguration("cube").get<string>("apiUrl", "");
+  return vscode.workspace.getConfiguration("cube-oss").get<string>("apiUrl", "");
 }
 
 /**
@@ -33,13 +33,13 @@ export function getApiUrl(): string {
  * registered) and whenever the settings change.
  */
 export function syncToggleContextKeys(): void {
-  const cfg = vscode.workspace.getConfiguration("cube");
+  const cfg = vscode.workspace.getConfiguration("cube-oss");
   const convertWebp = cfg.get<boolean>("convertWebp", true);
   const useUuid = cfg.get<boolean>("useUuid", false);
-  void vscode.commands.executeCommand("setContext", "cube.useUuid", useUuid);
+  void vscode.commands.executeCommand("setContext", "cube-oss.useUuid", useUuid);
   void vscode.commands.executeCommand(
     "setContext",
-    "cube.convertWebp",
+    "cube-oss.convertWebp",
     convertWebp,
   );
 }
@@ -48,5 +48,5 @@ export async function updateContextKeys(
   context: vscode.ExtensionContext,
 ): Promise<void> {
   const key = await context.secrets.get(API_KEY_SECRET);
-  await vscode.commands.executeCommand("setContext", "cube.hasApiKey", !!key);
+  await vscode.commands.executeCommand("setContext", "cube-oss.hasApiKey", !!key);
 }

@@ -1,5 +1,5 @@
 {
-  "name": "cube",
+  "name": "cube-oss",
   "displayName": "精弘 Cube 对象存储",
   "description": "Manage your Cube OSS in your code.",
   "version": "0.1.0",
@@ -20,17 +20,17 @@
     "configuration": {
       "title": "Cube OSS",
       "properties": {
-        "cube.apiUrl": {
+        "cube-oss.apiUrl": {
           "type": "string",
           "default": "",
           "markdownDescription": "Cube OSS 后端地址。"
         },
-        "cube.downloadDirectory": {
+        "cube-oss.downloadDirectory": {
           "type": "string",
           "default": "",
           "markdownDescription": "默认下载目录。"
         },
-        "cube.webpConvertible": {
+        "cube-oss.webpConvertible": {
           "type": "array",
           "items": {
             "type": "string"
@@ -46,12 +46,12 @@
           ],
           "markdownDescription": "开启 WebP 转换时，仅这些扩展名的图片会被转换。"
         },
-        "cube.convertWebp": {
+        "cube-oss.convertWebp": {
           "type": "boolean",
           "default": true,
           "markdownDescription": "开启后，上传时白名单内的图片会转换为 WebP。"
         },
-        "cube.useUuid": {
+        "cube-oss.useUuid": {
           "type": "boolean",
           "default": false,
           "markdownDescription": "开启后，上传文件会使用 UUID 重命名。"
@@ -81,7 +81,7 @@
       {
         "view": "cubeExplorer",
         "contents": "连接你的 Cube OSS 后端。\n[设置 API 地址](command:cube.setApiUrl)\n[设置 API Key](command:cube.setApiKey)",
-        "when": "!cube.hasApiKey"
+        "when": "!cube-oss.hasApiKey"
       }
     ],
     "commands": [
@@ -192,25 +192,25 @@
         },
         {
           "command": "cube.setFilenameKeep",
-          "when": "view == cubeExplorer && cube.useUuid",
+          "when": "view == cubeExplorer && cube-oss.useUuid",
           "group": "2_options@1",
           "title": "保留文件名"
         },
         {
           "command": "cube.setFilenameRandom",
-          "when": "view == cubeExplorer && !cube.useUuid",
+          "when": "view == cubeExplorer && !cube-oss.useUuid",
           "group": "2_options@1",
           "title": "开启随机文件名"
         },
         {
           "command": "cube.setFormatWebp",
-          "when": "view == cubeExplorer && !cube.convertWebp",
+          "when": "view == cubeExplorer && !cube-oss.convertWebp",
           "group": "2_options@2",
           "title": "转换为 WebP"
         },
         {
           "command": "cube.setFormatKeep",
-          "when": "view == cubeExplorer && cube.convertWebp",
+          "when": "view == cubeExplorer && cube-oss.convertWebp",
           "group": "2_options@2",
           "title": "保留原格式"
         },
