@@ -43,11 +43,79 @@ export interface CommandDeps {
 	tree: CubeTreeProvider;
 }
 
+interface UploadOptions {
+	convertWebp: boolean;
+	useUuid: boolean;
+}
+
+/** Ask for upload options; undefined = user cancelled. */
+async function pickUploadOptions(): Promise<UploadOptions | undefined> {
+	interface OptionItem extends vscode.QuickPickItem {
+		id: keyof UploadOptions;
+	}
+	const picks = await vscode.window.showQuickPick<OptionItem>(
+		[
+			{ id: 'convertWebp', label: '转换为 WebP', description: 'convert_webp' },
+			{ id: 'useUuid', label: '使用 UUID 重命名（不保留原文件名）', description: 'use_uuid' },
+		],
+		{
+			canPickMany: true,
+			title: 'Cube: 上传选项',
+			placeHolder: '直接 Enter 使用默认：保留原文件名，不转换 WebP',
+		},
+	);
+	if (picks === undefined) {
+		return undefined;
+	}
+	return {
+		convertWebp: picks.some((p) => p.id === 'convertWebp'),
+		useUuid: picks.some((p) => p.id === 'useUuid'),
+	};
+}
+
 export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
 	const { context, client, tree } = deps;
 
 	const reg = (name: string, fn: CommandFn) =>
 		vscode.commands.registerCommand(name, runSafely(fn));
+
+	const pickBucket = async (): Promise<string | undefined> => {
+		const buckets = await client.listBuckets();
+		return vscode.window.showQuickPick(buckets, { title: 'Cube: 选择 bucket' });
+	};
+
+	/** Upload local files into bucket/location with progress. */
+	const uploadFiles = async (
+		bucket: string,
+		location: string,
+		uris: vscode.Uri[],
+		opts: UploadOptions,
+	): Promise<void> => {
+		await vscode.window.withProgress(
+			{
+				location: vscode.ProgressLocation.Notification,
+				title: `Cube: uploading to ${bucket}${location ? '/' + location : ''}`,
+				cancellable: false,
+			},
+			async (progress) => {
+				const step = 100 / uris.length;
+				for (const uri of uris) {
+					const name = uri.path.split('/').pop() ?? 'file';
+					progress.report({ message: name });
+					const data = await vscode.workspace.fs.readFile(uri);
+					await client.upload(bucket, location, name, data, opts);
+					progress.report({ increment: step });
+				}
+			},
+		);
+		tree.invalidate(bucket, location);
+		await vscode.window.showInformationMessage(
+			`Cube: uploaded ${uris.length} file(s) to ${bucket}${location ? '/' + location : ''}.`,
+		);
+	};
+
+	const pickLocalFiles = (title: string) =>
+		vscode.window.showOpenDialog({ canSelectMany: true, openLabel: 'Upload', title });
 
 	return [
 		reg('cube.setApiKey', async () => {
@@ -99,48 +167,65 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
 				bucket = node.bucket;
 				location = node.kind === 'dir' ? node.path.replace(/\/$/, '') : '';
 			} else {
-				const buckets = await client.listBuckets();
-				bucket = await vscode.window.showQuickPick(buckets, {
-					title: 'Cube: Upload — choose a bucket',
-				});
+				bucket = await pickBucket();
 			}
 			if (!bucket) {
 				return;
 			}
 
-			const uris = await vscode.window.showOpenDialog({
-				canSelectMany: true,
-				openLabel: 'Upload',
-				title: `Upload to ${bucket}${location ? '/' + location : ''}`,
-			});
+			const uris = await pickLocalFiles(`Upload to ${bucket}${location ? '/' + location : ''}`);
 			if (!uris?.length) {
 				return;
 			}
+			const opts = await pickUploadOptions();
+			if (!opts) {
+				return;
+			}
+			await uploadFiles(bucket, location, uris, opts);
+		}),
 
-			await vscode.window.withProgress(
-				{
-					location: vscode.ProgressLocation.Notification,
-					title: `Cube: uploading to ${bucket}`,
-					cancellable: false,
-				},
-				async (progress) => {
-					let done = 0;
-					for (const uri of uris) {
-						const name = uri.path.split('/').pop() ?? 'file';
-						progress.report({ message: name, increment: (done / uris.length) * 100 });
-						const data = await vscode.workspace.fs.readFile(uri);
-						await client.upload(bucket!, location, name, data, {
-							convertWebp: false,
-							useUuid: false,
-						});
-						done++;
+		// Folders materialize on upload (backend has no explicit mkdir): the command
+		// asks for a folder name, then uploads chosen files into that location.
+		reg('cube.newFolder', async (node?: CubeNode) => {
+			let bucket: string | undefined;
+			let base = '';
+			if (node && node.kind !== 'file') {
+				bucket = node.bucket;
+				base = node.kind === 'dir' ? node.path.replace(/\/$/, '') : '';
+			} else {
+				bucket = await pickBucket();
+			}
+			if (!bucket) {
+				return;
+			}
+
+			const name = await vscode.window.showInputBox({
+				title: 'Cube: New Folder',
+				prompt: `在 ${bucket}/${base ? base + '/' : ''} 下新建文件夹（文件夹随上传的文件一起创建）`,
+				validateInput: (v) => {
+					if (!v.trim()) {
+						return '文件夹名不能为空';
 					}
+					if (/[/\\]/.test(v)) {
+						return '文件夹名不能包含 / 或 \\';
+					}
+					return undefined;
 				},
-			);
-			tree.invalidate(bucket, location);
-			await vscode.window.showInformationMessage(
-				`Cube: uploaded ${uris.length} file(s) to ${bucket}${location ? '/' + location : ''}.`,
-			);
+			});
+			if (name === undefined) {
+				return;
+			}
+			const location = base ? `${base}/${name.trim()}` : name.trim();
+
+			const uris = await pickLocalFiles(`Upload into new folder ${bucket}/${location}`);
+			if (!uris?.length) {
+				return;
+			}
+			const opts = await pickUploadOptions();
+			if (!opts) {
+				return;
+			}
+			await uploadFiles(bucket, location, uris, opts);
 		}),
 
 		reg('cube.downloadFile', async (node: CubeNode) => {
@@ -148,14 +233,23 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
 				return;
 			}
 			const target = await vscode.window.showSaveDialog({
-				defaultUri: vscode.Uri.file(node.meta.name),
+				defaultUri: defaultDownloadUri(node.meta.name),
 				saveLabel: 'Download',
 			});
 			if (!target) {
 				return;
 			}
-			const data = await client.download(node.bucket, nodeKey(node));
-			await vscode.workspace.fs.writeFile(target, data);
+			await vscode.window.withProgress(
+				{
+					location: vscode.ProgressLocation.Notification,
+					title: `Cube: downloading ${node.meta.name}`,
+					cancellable: false,
+				},
+				async () => {
+					const data = await client.download(node.bucket, nodeKey(node));
+					await vscode.workspace.fs.writeFile(target, data);
+				},
+			);
 			await vscode.window.showInformationMessage(`Cube: downloaded ${node.meta.name}.`);
 		}),
 
@@ -215,4 +309,24 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
 </html>`;
 		}),
 	];
+}
+
+/**
+ * Default download target: configured `cube.downloadDirectory` first (web
+ * extensions cannot resolve the OS home dir, so set it to e.g.
+ * `C:/Users/you/Downloads`), then the first workspace folder.
+ */
+function defaultDownloadUri(name: string): vscode.Uri {
+	const dir = vscode.workspace
+		.getConfiguration('cube')
+		.get<string>('downloadDirectory', '')
+		.trim();
+	if (dir) {
+		return vscode.Uri.file(`${dir.replace(/[\\/]+$/, '')}/${name}`);
+	}
+	const folder = vscode.workspace.workspaceFolders?.[0];
+	if (folder) {
+		return vscode.Uri.joinPath(folder.uri, name);
+	}
+	return vscode.Uri.file(name);
 }

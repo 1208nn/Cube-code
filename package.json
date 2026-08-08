@@ -19,6 +19,11 @@
           "type": "string",
           "default": "",
           "description": "Base URL of the Cube OSS backend (e.g. https://oss.example.com)"
+        },
+        "cube.downloadDirectory": {
+          "type": "string",
+          "default": "",
+          "description": "Default directory for downloads (absolute path, e.g. C:/Users/you/Downloads). Empty = first workspace folder, then system default."
         }
       }
     },
@@ -76,6 +81,12 @@
         "icon": "$(cloud-upload)"
       },
       {
+        "command": "cube.newFolder",
+        "title": "New Folder...",
+        "category": "Cube",
+        "icon": "$(new-folder)"
+      },
+      {
         "command": "cube.downloadFile",
         "title": "Download",
         "category": "Cube",
@@ -118,6 +129,11 @@
           "group": "navigation"
         },
         {
+          "command": "cube.newFolder",
+          "when": "view == cubeExplorer",
+          "group": "navigation"
+        },
+        {
           "command": "cube.setApiKey",
           "when": "view == cubeExplorer",
           "group": "1_settings"
@@ -131,6 +147,11 @@
       "view/item/context": [
         {
           "command": "cube.uploadFile",
+          "when": "view == cubeExplorer && viewItem =~ /^(bucket|folder)$/",
+          "group": "1_modification"
+        },
+        {
+          "command": "cube.newFolder",
           "when": "view == cubeExplorer && viewItem =~ /^(bucket|folder)$/",
           "group": "1_modification"
         },
