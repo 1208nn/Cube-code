@@ -2,7 +2,7 @@
   "name": "cube",
   "displayName": "精弘 Cube 对象存储",
   "description": "Manage your Cube OSS in your code.",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "engines": {
     "vscode": "^1.125.0"
   },
