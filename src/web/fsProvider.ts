@@ -48,10 +48,16 @@ export class CubeFileSystemProvider implements vscode.FileSystemProvider {
   constructor(
     private readonly client: CubeClient,
     private readonly onMutated: (bucket: string, location: string) => void,
-  ) {
+  ) {}
+
+  /**
+   * Returns a Disposable that cleans up internal listeners.
+   * The caller must push this into `context.subscriptions`.
+   */
+  register(): vscode.Disposable {
     // When a cube file's editor is closed, discard any pending draft so an
     // in-flight upload for that file is aborted.
-    vscode.workspace.onDidCloseTextDocument((doc) => {
+    return vscode.workspace.onDidCloseTextDocument((doc) => {
       if (doc.uri.scheme === "cube") {
         this.cancelPending(doc.uri);
       }
@@ -156,26 +162,33 @@ export class CubeFileSystemProvider implements vscode.FileSystemProvider {
     }
     // Defer the actual backend write: cache the new content and report success
     // to VS Code right away, then kick off the upload in the background.
-    const cacheKey = uri.toString();
-    this.pendingWrites.set(cacheKey, { uri, content });
-    void this.flushPending(cacheKey);
+    const pendingKey = uri.toString();
+    this.pendingWrites.set(pendingKey, { uri, content });
+    void this.flushPending(pendingKey);
   }
 
-  private async flushPending(key: string): Promise<void> {
-    const entry = this.pendingWrites.get(key);
+  private async flushPending(pendingKey: string): Promise<void> {
+    const entry = this.pendingWrites.get(pendingKey);
     if (!entry) {
       return;
     }
     const { bucket, key: objKey } = parseUri(entry.uri);
     const location = parentLocation(objKey);
     const fileName = baseName(objKey);
-    const doUpload = () =>
-      this.client.upload(bucket, location, fileName, entry.content, {
+    // Always read content from the map so that a newer save that arrived while
+    // an async modal was open is used instead of the stale snapshot.
+    const uploadLatest = () => {
+      const latest = this.pendingWrites.get(pendingKey);
+      if (!latest) {
+        return Promise.resolve();
+      }
+      return this.client.upload(bucket, location, fileName, latest.content, {
         convertWebp: false,
         useUuid: false,
       });
+    };
     try {
-      await doUpload();
+      await uploadLatest();
     } catch (e) {
       if (e instanceof ApiError && /已存在|exists/i.test(e.message)) {
         // The object already exists on the backend. Ask the user to force an
@@ -188,12 +201,12 @@ export class CubeFileSystemProvider implements vscode.FileSystemProvider {
           "取消",
         );
         // The editor may have been closed while the prompt was showing.
-        if (!this.pendingWrites.has(key)) {
+        if (!this.pendingWrites.has(pendingKey)) {
           return;
         }
         if (choice === "强制覆盖") {
           await this.client.delete(bucket, objKey);
-          await doUpload();
+          await uploadLatest();
         } else {
           await vscode.window.showInformationMessage(
             "Cube：已取消覆盖，更改仍暂存。",
@@ -207,7 +220,7 @@ export class CubeFileSystemProvider implements vscode.FileSystemProvider {
     // A confirmed/in-progress upload always completes, even if the editor was
     // closed while it was running — so we never abort it here. (The only thing
     // close cancels is an *unconfirmed* overwrite prompt, handled above.)
-    this.pendingWrites.delete(key);
+    this.pendingWrites.delete(pendingKey);
     this.touch(bucket, location);
     this._onDidChangeFile.fire([
       { type: vscode.FileChangeType.Changed, uri: entry.uri },

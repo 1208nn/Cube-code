@@ -32,6 +32,7 @@ export async function activate(
   });
   context.subscriptions.push(
     treeView,
+    fsProvider.register(),
     vscode.workspace.registerFileSystemProvider("cube", fsProvider, {
       isCaseSensitive: true,
     }),

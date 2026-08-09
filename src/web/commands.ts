@@ -524,6 +524,11 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
         { enableScripts: false },
       );
       const src = client.thumbnailUrl(node.bucket, nodeKey(node));
+      const escapedName = node.meta.name
+        .replace(/&/g, "&amp;")
+        .replace(/"/g, "&quot;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
       panel.webview.html = `<!DOCTYPE html>
 <html>
 <head>
@@ -531,7 +536,7 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src http: https:; style-src 'unsafe-inline';">
 <style>body{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#1e1e1e}img{max-width:100%;max-height:100vh}</style>
 </head>
-<body><img src="${src}" alt="${node.meta.name}"></body>
+<body><img src="${src}" alt="${escapedName}"></body>
 </html>`;
     }),
   ];
