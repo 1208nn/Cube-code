@@ -23,6 +23,14 @@ function baseName(key: string): string {
   return idx === -1 ? key : key.slice(idx + 1);
 }
 
+/** Shared stat returned for any virtual directory node. */
+const DIR_STAT: vscode.FileStat = {
+  type: vscode.FileType.Directory,
+  ctime: 0,
+  mtime: 0,
+  size: 0,
+};
+
 /**
  * FileSystemProvider for `cube://{bucket}/{object_key}` URIs.
  * Opening a file reads it through the public file URL; saving re-uploads it.
@@ -101,7 +109,7 @@ export class CubeFileSystemProvider implements vscode.FileSystemProvider {
   async stat(uri: vscode.Uri): Promise<vscode.FileStat> {
     const { bucket, key } = parseUri(uri);
     if (!bucket) {
-      return { type: vscode.FileType.Directory, ctime: 0, mtime: 0, size: 0 };
+      return DIR_STAT;
     }
     if (!key || key.endsWith("/")) {
       // Bucket root or explicit directory: verify it exists.
@@ -110,10 +118,10 @@ export class CubeFileSystemProvider implements vscode.FileSystemProvider {
         if (!buckets.includes(bucket)) {
           throw vscode.FileSystemError.FileNotFound(uri);
         }
-        return { type: vscode.FileType.Directory, ctime: 0, mtime: 0, size: 0 };
+        return DIR_STAT;
       }
       await this.listFilesCached(bucket, key.replace(/\/$/, ""));
-      return { type: vscode.FileType.Directory, ctime: 0, mtime: 0, size: 0 };
+      return DIR_STAT;
     }
     const location = parentLocation(key);
     const metas = await this.listFilesCached(bucket, location);
@@ -124,7 +132,7 @@ export class CubeFileSystemProvider implements vscode.FileSystemProvider {
       throw vscode.FileSystemError.FileNotFound(uri);
     }
     if (meta.type === "dir") {
-      return { type: vscode.FileType.Directory, ctime: 0, mtime: 0, size: 0 };
+      return DIR_STAT;
     }
     return {
       type: vscode.FileType.File,

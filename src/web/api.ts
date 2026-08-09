@@ -117,14 +117,19 @@ export class CubeClient {
     await this.request<unknown>("api/delete", { method: "DELETE", body: form });
   }
 
+  /** Percent-encode each path segment of an object key. */
+  private encodedPath(objectKey: string): string {
+    return objectKey.split("/").map(encodeURIComponent).join("/");
+  }
+
   /** Public (unauthenticated) file URL. */
   fileUrl(bucket: string, objectKey: string): string {
-    return `${this.baseUrl()}files/${encodeURIComponent(bucket)}/${objectKey.split("/").map(encodeURIComponent).join("/")}`;
+    return `${this.baseUrl()}files/${encodeURIComponent(bucket)}/${this.encodedPath(objectKey)}`;
   }
 
   /** Public (unauthenticated) image thumbnail URL. */
   thumbnailUrl(bucket: string, objectKey: string): string {
-    return `${this.baseUrl()}thumbnails/${encodeURIComponent(bucket)}/${objectKey.split("/").map(encodeURIComponent).join("/")}`;
+    return `${this.baseUrl()}thumbnails/${encodeURIComponent(bucket)}/${this.encodedPath(objectKey)}`;
   }
 
   /** Fetch raw bytes of an object via its public file URL. */

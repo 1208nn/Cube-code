@@ -15,9 +15,8 @@ export function nodeKey(node: CubeNode): string {
 }
 
 export function nodeUri(node: CubeNode): vscode.Uri {
-  const bucket = node.bucket;
   const key = nodeKey(node).split("/").map(encodeURIComponent).join("/");
-  return vscode.Uri.parse(`cube://${encodeURIComponent(bucket)}/${key}`);
+  return vscode.Uri.parse(`cube://${encodeURIComponent(node.bucket)}/${key}`);
 }
 
 export class CubeTreeProvider implements vscode.TreeDataProvider<CubeNode> {
@@ -100,14 +99,15 @@ export class CubeTreeProvider implements vscode.TreeDataProvider<CubeNode> {
       }
       case "dir": {
         const name = node.path.replace(/\/$/, "").split("/").pop() ?? node.path;
+        const uri = nodeUri(node);
         const item = new vscode.TreeItem(
           name,
           vscode.TreeItemCollapsibleState.Collapsed,
         );
-        item.id = nodeUri(node).toString();
+        item.id = uri.toString();
         item.contextValue = "folder";
         item.iconPath = new vscode.ThemeIcon("folder");
-        item.resourceUri = nodeUri(node);
+        item.resourceUri = uri;
         return item;
       }
       case "file": {

@@ -87,10 +87,11 @@ function webpConvertibleRegex(): RegExp {
     ".tiff",
     ".bmp",
   ];
-  const parts = exts
-    .map((e) => e.trim().toLowerCase())
-    .map((e) => (e.startsWith(".") ? e : "." + e))
-    .map((e) => e.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const parts = exts.map((e) => {
+    const ext = e.trim().toLowerCase();
+    const dotted = ext.startsWith(".") ? ext : "." + ext;
+    return dotted.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  });
   return new RegExp(`(${parts.join("|")})$`, "i");
 }
 
@@ -135,15 +136,11 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
   ): Promise<void> => {
     for (const t of targets) {
       const uri = nodeUri(t).toString();
-      const tabs: vscode.Tab[] = [];
-      for (const group of vscode.window.tabGroups.all) {
-        for (const tab of group.tabs) {
-          const inp = tab.input as { uri?: vscode.Uri };
-          if (inp?.uri?.toString() === uri) {
-            tabs.push(tab);
-          }
-        }
-      }
+      const tabs = vscode.window.tabGroups.all
+        .flatMap((g) => g.tabs)
+        .filter(
+          (tab) => (tab.input as { uri?: vscode.Uri })?.uri?.toString() === uri,
+        );
       if (tabs.length) {
         await vscode.window.tabGroups.close(tabs);
       }
@@ -274,27 +271,14 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
       await vscode.window.showInformationMessage("Cube：已保存 API 地址。");
     }),
 
-    reg("cube.refresh", async () => {
-      tree.refresh();
-    }),
+    reg("cube.refresh", () => tree.refresh()),
 
     // Menu label = the ACTION performed; the matching `when` shows it only while
     // the opposite mode is active, so clicking switches and the menu re-renders.
-    reg("cube.setFilenameKeep", async () => {
-      await setBool("useUuid", false);
-    }),
-
-    reg("cube.setFilenameRandom", async () => {
-      await setBool("useUuid", true);
-    }),
-
-    reg("cube.setFormatWebp", async () => {
-      await setBool("convertWebp", true);
-    }),
-
-    reg("cube.setFormatKeep", async () => {
-      await setBool("convertWebp", false);
-    }),
+    reg("cube.setFilenameKeep", () => setBool("useUuid", false)),
+    reg("cube.setFilenameRandom", () => setBool("useUuid", true)),
+    reg("cube.setFormatWebp", () => setBool("convertWebp", true)),
+    reg("cube.setFormatKeep", () => setBool("convertWebp", false)),
 
     reg("cube.openSettings", async () => {
       await vscode.commands.executeCommand(
