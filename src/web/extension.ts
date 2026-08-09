@@ -24,16 +24,18 @@ export async function activate(
     tree.invalidate(bucket, location),
   );
 
+  const treeView = vscode.window.createTreeView("cubeExplorer", {
+    treeDataProvider: tree,
+    showCollapseAll: true,
+    canSelectMany: true,
+    dragAndDropController: dragDrop,
+  });
   context.subscriptions.push(
-    vscode.window.createTreeView("cubeExplorer", {
-      treeDataProvider: tree,
-      showCollapseAll: true,
-      dragAndDropController: dragDrop,
-    }),
+    treeView,
     vscode.workspace.registerFileSystemProvider("cube", fsProvider, {
       isCaseSensitive: true,
     }),
-    ...registerCommands({ context, client, tree }),
+    ...registerCommands({ context, client, tree, treeView }),
     context.secrets.onDidChange(() => {
       void updateContextKeys(context).then(() => tree.refresh());
     }),
