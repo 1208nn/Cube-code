@@ -155,11 +155,8 @@ function formatSize(bytes: number): string {
  * Drop onto the tree => upload. Drag from the tree => produce real files
  * (DataTransferFile) so the OS / Explorer can save them wherever you drop.
  */
-export class CubeDragDropController
-  implements vscode.TreeDragAndDropController<CubeNode>
-{
-  private static readonly TREE_MIME =
-    "application/vnd.code.tree.cubeexplorer";
+export class CubeDragDropController implements vscode.TreeDragAndDropController<CubeNode> {
+  private static readonly TREE_MIME = "application/vnd.code.tree.cubeexplorer";
   readonly dragMimeTypes: readonly string[] = [
     "files",
     "text/uri-list",

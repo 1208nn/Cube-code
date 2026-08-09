@@ -345,146 +345,155 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
       await uploadFiles(bucket, location, uris);
     }),
 
-    reg("cube.downloadFile", async (node: CubeNode, nodes?: readonly CubeNode[]) => {
-      const targets = selectedFileNodes(node, nodes);
-      if (!targets.length) {
-        return;
-      }
-
-      // Single file keeps the familiar "pick save location" dialog.
-      if (targets.length === 1) {
-        const t = targets[0];
-        const target = await vscode.window.showSaveDialog({
-          defaultUri: defaultDownloadUri(t.meta.name),
-          saveLabel: "Download",
-        });
-        if (!target) {
+    reg(
+      "cube.downloadFile",
+      async (node: CubeNode, nodes?: readonly CubeNode[]) => {
+        const targets = selectedFileNodes(node, nodes);
+        if (!targets.length) {
           return;
         }
+
+        // Single file keeps the familiar "pick save location" dialog.
+        if (targets.length === 1) {
+          const t = targets[0];
+          const target = await vscode.window.showSaveDialog({
+            defaultUri: defaultDownloadUri(t.meta.name),
+            saveLabel: "Download",
+          });
+          if (!target) {
+            return;
+          }
+          await vscode.window.withProgress(
+            {
+              location: vscode.ProgressLocation.Notification,
+              title: `Cube：正在下载 ${t.meta.name}`,
+              cancellable: false,
+            },
+            async () => {
+              const data = await client.download(t.bucket, nodeKey(t));
+              await vscode.workspace.fs.writeFile(target, data);
+            },
+          );
+          await vscode.window.showInformationMessage(
+            `Cube：已下载 ${t.meta.name}。`,
+          );
+          return;
+        }
+
+        // Multiple files: pick one destination folder, download them all into it.
+        const picked = await vscode.window.showOpenDialog({
+          canSelectFiles: false,
+          canSelectFolders: true,
+          openLabel: "下载",
+          title: `Cube：下载 ${targets.length} 个文件到文件夹`,
+        });
+        if (!picked?.length) {
+          return;
+        }
+        const folder = picked[0];
         await vscode.window.withProgress(
           {
             location: vscode.ProgressLocation.Notification,
-            title: `Cube：正在下载 ${t.meta.name}`,
+            title: `Cube：正在下载 ${targets.length} 个文件`,
             cancellable: false,
           },
-          async () => {
-            const data = await client.download(t.bucket, nodeKey(t));
-            await vscode.workspace.fs.writeFile(target, data);
+          async (progress) => {
+            const step = 100 / targets.length;
+            for (const t of targets) {
+              progress.report({ message: t.meta.name });
+              const data = await client.download(t.bucket, nodeKey(t));
+              await vscode.workspace.fs.writeFile(
+                vscode.Uri.joinPath(folder, t.meta.name),
+                data,
+              );
+              progress.report({ increment: step });
+            }
           },
         );
         await vscode.window.showInformationMessage(
-          `Cube：已下载 ${t.meta.name}。`,
+          `Cube：已下载 ${targets.length} 个文件到 ${folder.path}。`,
         );
-        return;
-      }
+      },
+    ),
 
-      // Multiple files: pick one destination folder, download them all into it.
-      const picked = await vscode.window.showOpenDialog({
-        canSelectFiles: false,
-        canSelectFolders: true,
-        openLabel: "下载",
-        title: `Cube：下载 ${targets.length} 个文件到文件夹`,
-      });
-      if (!picked?.length) {
-        return;
-      }
-      const folder = picked[0];
-      await vscode.window.withProgress(
-        {
-          location: vscode.ProgressLocation.Notification,
-          title: `Cube：正在下载 ${targets.length} 个文件`,
-          cancellable: false,
-        },
-        async (progress) => {
-          const step = 100 / targets.length;
-          for (const t of targets) {
-            progress.report({ message: t.meta.name });
-            const data = await client.download(t.bucket, nodeKey(t));
-            await vscode.workspace.fs.writeFile(
-              vscode.Uri.joinPath(folder, t.meta.name),
-              data,
-            );
-            progress.report({ increment: step });
-          }
-        },
-      );
-      await vscode.window.showInformationMessage(
-        `Cube：已下载 ${targets.length} 个文件到 ${folder.path}。`,
-      );
-    }),
+    reg(
+      "cube.deleteFile",
+      async (node: CubeNode, nodes?: readonly CubeNode[]) => {
+        const targets = selectedFileNodes(node, nodes);
+        if (!targets.length) {
+          return;
+        }
+        const confirm = await vscode.window.showWarningMessage(
+          `确定要删除选中的 ${targets.length} 个文件吗？此操作不可撤销。`,
+          { modal: true },
+          "删除",
+        );
+        if (confirm !== "删除") {
+          return;
+        }
+        const invalids = new Set<string>();
+        await vscode.window.withProgress(
+          {
+            location: vscode.ProgressLocation.Notification,
+            title: `Cube：正在删除 ${targets.length} 个文件`,
+            cancellable: false,
+          },
+          async (progress) => {
+            const step = 100 / targets.length;
+            for (const t of targets) {
+              progress.report({ message: t.meta.name });
+              await client.delete(t.bucket, nodeKey(t));
+              const key = nodeKey(t);
+              const location = key.includes("/")
+                ? key.slice(0, key.lastIndexOf("/"))
+                : "";
+              invalids.add(`${t.bucket}::${location}`);
+              progress.report({ increment: step });
+            }
+          },
+        );
+        for (const k of invalids) {
+          const sep = k.indexOf("::");
+          tree.invalidate(k.slice(0, sep), k.slice(sep + 2));
+        }
+        // Close any open editor tabs for the deleted files so the right side
+        // doesn't keep showing a now-deleted file.
+        await closeDeletedTabs(targets);
+        await vscode.window.showInformationMessage(
+          `Cube：已删除 ${targets.length} 个文件。`,
+        );
+      },
+    ),
 
-    reg("cube.deleteFile", async (node: CubeNode, nodes?: readonly CubeNode[]) => {
-      const targets = selectedFileNodes(node, nodes);
-      if (!targets.length) {
-        return;
-      }
-      const confirm = await vscode.window.showWarningMessage(
-        `确定要删除选中的 ${targets.length} 个文件吗？此操作不可撤销。`,
-        { modal: true },
-        "删除",
-      );
-      if (confirm !== "删除") {
-        return;
-      }
-      const invalids = new Set<string>();
-      await vscode.window.withProgress(
-        {
-          location: vscode.ProgressLocation.Notification,
-          title: `Cube：正在删除 ${targets.length} 个文件`,
-          cancellable: false,
-        },
-        async (progress) => {
-          const step = 100 / targets.length;
-          for (const t of targets) {
-            progress.report({ message: t.meta.name });
-            await client.delete(t.bucket, nodeKey(t));
-            const key = nodeKey(t);
-            const location = key.includes("/")
-              ? key.slice(0, key.lastIndexOf("/"))
-              : "";
-            invalids.add(`${t.bucket}::${location}`);
-            progress.report({ increment: step });
-          }
-        },
-      );
-      for (const k of invalids) {
-        const sep = k.indexOf("::");
-        tree.invalidate(k.slice(0, sep), k.slice(sep + 2));
-      }
-      // Close any open editor tabs for the deleted files so the right side
-      // doesn't keep showing a now-deleted file.
-      await closeDeletedTabs(targets);
-      await vscode.window.showInformationMessage(
-        `Cube：已删除 ${targets.length} 个文件。`,
-      );
-    }),
-
-    reg("cube.copyFileUrl", async (node: CubeNode, nodes?: readonly CubeNode[]) => {
-      const targets = selectedFileNodes(node, nodes);
-      if (!targets.length) {
-        return;
-      }
-      const urls = targets
-        .map((t) => client.fileUrl(t.bucket, nodeKey(t)))
-        .join("\n");
-      try {
-        await vscode.env.clipboard.writeText(urls);
-      } catch {
-        // The async clipboard API can be blocked (e.g. non-secure context in a
-        // web extension). Fall back to a pre-filled input box the user can copy.
-        await vscode.window.showInputBox({
-          title: `Cube：复制 ${targets.length} 个文件地址（请手动复制）`,
-          value: urls,
-          prompt: "按 Ctrl/Cmd+C 复制以下地址",
-        });
-        return;
-      }
-      await vscode.window.showInformationMessage(
-        targets.length > 1
-          ? `Cube：已复制 ${targets.length} 个文件地址。`
-          : "Cube：文件地址已复制到剪贴板。",
-      );
-    }),
+    reg(
+      "cube.copyFileUrl",
+      async (node: CubeNode, nodes?: readonly CubeNode[]) => {
+        const targets = selectedFileNodes(node, nodes);
+        if (!targets.length) {
+          return;
+        }
+        const urls = targets
+          .map((t) => client.fileUrl(t.bucket, nodeKey(t)))
+          .join("\n");
+        try {
+          await vscode.env.clipboard.writeText(urls);
+        } catch {
+          // The async clipboard API can be blocked (e.g. non-secure context in a
+          // web extension). Fall back to a pre-filled input box the user can copy.
+          await vscode.window.showInputBox({
+            title: `Cube：复制 ${targets.length} 个文件地址（请手动复制）`,
+            value: urls,
+            prompt: "按 Ctrl/Cmd+C 复制以下地址",
+          });
+          return;
+        }
+        await vscode.window.showInformationMessage(
+          targets.length > 1
+            ? `Cube：已复制 ${targets.length} 个文件地址。`
+            : "Cube：文件地址已复制到剪贴板。",
+        );
+      },
+    ),
 
     reg("cube.openFile", async (node: CubeNode) => {
       if (node?.kind !== "file") {
