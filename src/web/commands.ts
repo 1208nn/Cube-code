@@ -220,7 +220,7 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
     reg("cube.uploadFile", async (node?: CubeNode) => {
       let bucket: string | undefined;
       let location = "";
-      if (node && node.kind !== "file") {
+      if (node && (node.kind === "bucket" || node.kind === "dir")) {
         bucket = node.bucket;
         location = node.kind === "dir" ? node.path.replace(/\/$/, "") : "";
       } else {
@@ -244,7 +244,7 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
     reg("cube.newFolder", async (node?: CubeNode) => {
       let bucket: string | undefined;
       let base = "";
-      if (node && node.kind !== "file") {
+      if (node && (node.kind === "bucket" || node.kind === "dir")) {
         bucket = node.bucket;
         base = node.kind === "dir" ? node.path.replace(/\/$/, "") : "";
       } else {
