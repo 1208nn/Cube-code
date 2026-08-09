@@ -100,10 +100,21 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
   const reg = (name: string, fn: CommandFn) =>
     vscode.commands.registerCommand(name, runSafely(fn));
 
+  // Track the latest multi-selection. Commands invoked WITHOUT arguments (e.g.
+  // the Delete keybinding, or palette) can't rely on the live `treeView.selection`
+  // read at key-press time, which can come back empty — so we keep the last
+  // known selection and fall back to it.
+  let currentSelection: readonly CubeNode[] = [];
+  context.subscriptions.push(
+    treeView.onDidChangeSelection((e) => {
+      currentSelection = e.selection;
+    }),
+  );
+
   // Resolve the file nodes a view command should act on. VS Code passes
   // (clickedItem, selectedItems[]) for multi-select context menus, but we also
-  // fall back to the tree view's live selection so the command is robust even
-  // when the arguments aren't delivered on every invocation path.
+  // fall back to the tracked selection so the command works from keybindings /
+  // command palette too.
   const selectedFileNodes = (
     node: CubeNode | undefined,
     nodes?: readonly CubeNode[],
@@ -112,9 +123,31 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
     if (fromArgs.length) {
       return fromArgs;
     }
-    return treeView.selection.filter(
+    const sel = currentSelection.length ? currentSelection : treeView.selection;
+    return sel.filter(
       (n): n is Extract<CubeNode, { kind: "file" }> => n.kind === "file",
     );
+  };
+
+  /** Close any open editor tabs whose resource URI matches a deleted node. */
+  const closeDeletedTabs = async (
+    targets: readonly CubeNode[],
+  ): Promise<void> => {
+    for (const t of targets) {
+      const uri = nodeUri(t).toString();
+      const tabs: vscode.Tab[] = [];
+      for (const group of vscode.window.tabGroups.all) {
+        for (const tab of group.tabs) {
+          const inp = tab.input as { uri?: vscode.Uri };
+          if (inp?.uri?.toString() === uri) {
+            tabs.push(tab);
+          }
+        }
+      }
+      if (tabs.length) {
+        await vscode.window.tabGroups.close(tabs);
+      }
+    }
   };
 
   // Keep the title-bar toggle items in sync with the upload-mode settings.
@@ -418,6 +451,9 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
         const sep = k.indexOf("::");
         tree.invalidate(k.slice(0, sep), k.slice(sep + 2));
       }
+      // Close any open editor tabs for the deleted files so the right side
+      // doesn't keep showing a now-deleted file.
+      await closeDeletedTabs(targets);
       await vscode.window.showInformationMessage(
         `Cube：已删除 ${targets.length} 个文件。`,
       );

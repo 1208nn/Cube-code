@@ -58,6 +58,13 @@
         }
       }
     },
+    "keybindings": [
+      {
+        "key": "delete",
+        "command": "cube.deleteFile",
+        "when": "sideBarFocus"
+      }
+    ],
     "viewsContainers": {
       "activitybar": [
         {
