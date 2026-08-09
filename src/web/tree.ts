@@ -151,6 +151,12 @@ function formatSize(bytes: number): string {
   return `${size.toFixed(1)} ${units[i]}`;
 }
 
+/** A file item to be uploaded via drag-and-drop. */
+interface DroppedFile {
+  name: string;
+  read: () => Promise<Uint8Array>;
+}
+
 /**
  * Drop onto the tree => upload. Drag from the tree => produce real files
  * (DataTransferFile) so the OS / Explorer can save them wherever you drop.
@@ -201,10 +207,6 @@ export class CubeDragDropController implements vscode.TreeDragAndDropController<
       location = "";
     }
 
-    interface DroppedFile {
-      name: string;
-      read: () => Promise<Uint8Array>;
-    }
     const files: DroppedFile[] = [];
 
     // From VS Code Explorer / desktop (uri-list)
@@ -245,7 +247,6 @@ export class CubeDragDropController implements vscode.TreeDragAndDropController<
         cancellable: false,
       },
       async (progress) => {
-        let done = 0;
         for (const file of files) {
           if (token.isCancellationRequested) {
             break;
@@ -259,13 +260,12 @@ export class CubeDragDropController implements vscode.TreeDragAndDropController<
             convertWebp: false,
             useUuid: false,
           });
-          done++;
         }
       },
     );
     this.tree.invalidate(bucket, location);
     await vscode.window.showInformationMessage(
-      `Cube: uploaded ${files.length} file(s) to ${bucket}${location ? "/" + location : ""}.`,
+      `Cube：已上传 ${files.length} 个文件到 ${bucket}${location ? "/" + location : ""}。`,
     );
   }
 

@@ -167,6 +167,26 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
     return vscode.window.showQuickPick(buckets, { title: "Cube：选择 bucket" });
   };
 
+  /**
+   * Resolve bucket + base location from a tree node context.
+   * Returns `undefined` for bucket if the user cancels the picker.
+   */
+  const resolveBucketLocation = async (
+    node: CubeNode | undefined,
+  ): Promise<{ bucket: string; location: string } | undefined> => {
+    if (node && (node.kind === "bucket" || node.kind === "dir")) {
+      return {
+        bucket: node.bucket,
+        location: node.kind === "dir" ? node.path.replace(/\/$/, "") : "",
+      };
+    }
+    const bucket = await pickBucket();
+    if (!bucket) {
+      return undefined;
+    }
+    return { bucket, location: "" };
+  };
+
   /** Upload local files into bucket/location with progress. */
   const uploadFiles = async (
     bucket: string,
@@ -284,18 +304,11 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
     }),
 
     reg("cube.uploadFile", async (node?: CubeNode) => {
-      let bucket: string | undefined;
-      let location = "";
-      if (node && (node.kind === "bucket" || node.kind === "dir")) {
-        bucket = node.bucket;
-        location = node.kind === "dir" ? node.path.replace(/\/$/, "") : "";
-      } else {
-        bucket = await pickBucket();
-      }
-      if (!bucket) {
+      const resolved = await resolveBucketLocation(node);
+      if (!resolved) {
         return;
       }
-
+      const { bucket, location } = resolved;
       const uris = await pickLocalFiles(
         `上传到 ${bucket}${location ? "/" + location : ""}`,
       );
@@ -308,18 +321,11 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
     // Folders materialize on upload (backend has no explicit mkdir): the command
     // asks for a folder name, then uploads chosen files into that location.
     reg("cube.newFolder", async (node?: CubeNode) => {
-      let bucket: string | undefined;
-      let base = "";
-      if (node && (node.kind === "bucket" || node.kind === "dir")) {
-        bucket = node.bucket;
-        base = node.kind === "dir" ? node.path.replace(/\/$/, "") : "";
-      } else {
-        bucket = await pickBucket();
-      }
-      if (!bucket) {
+      const resolved = await resolveBucketLocation(node);
+      if (!resolved) {
         return;
       }
-
+      const { bucket, location: base } = resolved;
       const name = await vscode.window.showInputBox({
         title: "Cube：新建文件夹",
         prompt: `在 ${bucket}/${base ? base + "/" : ""} 下新建文件夹（文件夹随上传的文件一起创建）`,
@@ -442,8 +448,8 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
             const step = 100 / targets.length;
             for (const t of targets) {
               progress.report({ message: t.meta.name });
-              await client.delete(t.bucket, nodeKey(t));
               const key = nodeKey(t);
+              await client.delete(t.bucket, key);
               const location = key.includes("/")
                 ? key.slice(0, key.lastIndexOf("/"))
                 : "";
