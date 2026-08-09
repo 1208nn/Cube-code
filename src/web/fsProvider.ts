@@ -36,6 +36,14 @@ export class CubeFileSystemProvider implements vscode.FileSystemProvider {
 
   private readonly dirCache = new Map<string, FileMeta[]>();
 
+  // Saves are deferred: writeFile caches the new content and returns success
+  // immediately, then a notification asks the user to confirm the real upload.
+  private readonly pendingWrites = new Map<
+    string,
+    { uri: vscode.Uri; content: Uint8Array }
+  >();
+  private readonly activePrompts = new Set<string>();
+
   constructor(
     private readonly client: CubeClient,
     private readonly onMutated: (bucket: string, location: string) => void,
@@ -128,22 +136,81 @@ export class CubeFileSystemProvider implements vscode.FileSystemProvider {
     content: Uint8Array,
     _options: { create: boolean; overwrite: boolean },
   ): Promise<void> {
-    const { bucket, key } = parseUri(uri);
+    const { key } = parseUri(uri);
     if (!key || key.endsWith("/")) {
       throw vscode.FileSystemError.FileIsADirectory(uri);
     }
-    await this.client.upload(
-      bucket,
-      parentLocation(key),
-      baseName(key),
-      content,
-      {
+    // Defer the actual backend write: cache the new content and report success
+    // to VS Code right away, then ask the user (bottom-right notification)
+    // whether to really push it to Cube OSS.
+    this.pendingWrites.set(uri.toString(), { uri, content });
+    this.promptSave(uri);
+  }
+
+  private promptSave(uri: vscode.Uri): void {
+    const key = uri.toString();
+    if (this.activePrompts.has(key)) {
+      return;
+    }
+    this.activePrompts.add(key);
+    void vscode.window
+      .showInformationMessage(
+        `是否将更改保存到 Cube OSS？\n${baseName(parseUri(uri).key)}`,
+        { modal: false },
+        "保存到 Cube",
+        "放弃",
+      )
+      .then(async (choice) => {
+        this.activePrompts.delete(key);
+        if (!this.pendingWrites.has(key)) {
+          return;
+        }
+        if (choice === "保存到 Cube") {
+          await this.flushPending(key);
+        } else if (choice === "放弃") {
+          // Drop the local draft; the editor stays clean but the backend
+          // keeps the old version.
+          this.pendingWrites.delete(key);
+        }
+        // Dismissed (X): keep the pending draft so it can be re-offered on the
+        // next save.
+      });
+  }
+
+  private async flushPending(key: string): Promise<void> {
+    const entry = this.pendingWrites.get(key);
+    if (!entry) {
+      return;
+    }
+    this.pendingWrites.delete(key);
+    const { bucket, key: objKey } = parseUri(entry.uri);
+    const location = parentLocation(objKey);
+    const fileName = baseName(objKey);
+    try {
+      // The backend's api/upload rejects overwriting an existing object, so
+      // delete the old one first, then upload the new content.
+      try {
+        await this.client.delete(bucket, objKey);
+      } catch {
+        // A brand-new file has nothing to delete yet.
+      }
+      await this.client.upload(bucket, location, fileName, entry.content, {
         convertWebp: false,
         useUuid: false,
-      },
-    );
-    this.touch(bucket, parentLocation(key));
-    this._onDidChangeFile.fire([{ type: vscode.FileChangeType.Changed, uri }]);
+      });
+      this.touch(bucket, location);
+      this._onDidChangeFile.fire([
+        { type: vscode.FileChangeType.Changed, uri: entry.uri },
+      ]);
+      await vscode.window.showInformationMessage("Cube：已保存到 OSS。");
+    } catch (e) {
+      // Keep the draft so the user can retry via another save.
+      this.pendingWrites.set(key, entry);
+      const msg = e instanceof Error ? e.message : String(e);
+      await vscode.window.showErrorMessage(
+        `Cube：保存失败，${msg}\n更改已暂存，可再次保存以重试。`,
+      );
+    }
   }
 
   async delete(
