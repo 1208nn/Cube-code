@@ -454,7 +454,12 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
       if (node?.kind !== "file") {
         return;
       }
-      await vscode.commands.executeCommand("vscode.open", nodeUri(node));
+      // Open the file but keep focus in the explorer so that a fast open (when
+      // the network is quick) doesn't steal focus from the sidebar and break
+      // continued Ctrl/Shift multi-select in the tree.
+      await vscode.commands.executeCommand("vscode.open", nodeUri(node), {
+        preserveFocus: true,
+      });
     }),
 
     reg("cube.previewImage", async (node: CubeNode) => {

@@ -93,6 +93,7 @@ export class CubeTreeProvider implements vscode.TreeDataProvider<CubeNode> {
           node.bucket,
           vscode.TreeItemCollapsibleState.Collapsed,
         );
+        item.id = nodeUri(node).toString();
         item.contextValue = "bucket";
         item.iconPath = new vscode.ThemeIcon("database");
         return item;
@@ -103,6 +104,7 @@ export class CubeTreeProvider implements vscode.TreeDataProvider<CubeNode> {
           name,
           vscode.TreeItemCollapsibleState.Collapsed,
         );
+        item.id = nodeUri(node).toString();
         item.contextValue = "folder";
         item.iconPath = new vscode.ThemeIcon("folder");
         item.resourceUri = nodeUri(node);
@@ -114,6 +116,7 @@ export class CubeTreeProvider implements vscode.TreeDataProvider<CubeNode> {
           node.meta.name,
           vscode.TreeItemCollapsibleState.None,
         );
+        item.id = nodeUri(node).toString();
         item.contextValue = isImage ? "image" : "file";
         item.iconPath = new vscode.ThemeIcon(isImage ? "file-media" : "file");
         item.resourceUri = nodeUri(node);
