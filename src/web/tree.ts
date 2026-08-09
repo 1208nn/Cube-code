@@ -185,15 +185,24 @@ export class CubeDragDropController
     if (dataTransfer.get(CubeDragDropController.TREE_MIME)) {
       return;
     }
-    if (!target || target.kind === "file") {
+    if (!target) {
       await vscode.window.showWarningMessage(
-        "Cube: drop files onto a bucket or folder to upload.",
+        "Cube: drop files onto a bucket, folder, or file to upload.",
       );
       return;
     }
     const bucket = target.bucket;
-    const location =
-      target.kind === "dir" ? target.path.replace(/\/$/, "") : "";
+    let location: string;
+    if (target.kind === "file") {
+      // Dropping onto a file uploads into that file's parent folder (i.e. the
+      // same level as the file), which feels natural when organizing uploads.
+      const key = nodeKey(target);
+      location = key.includes("/") ? key.slice(0, key.lastIndexOf("/")) : "";
+    } else if (target.kind === "dir") {
+      location = target.path.replace(/\/$/, "");
+    } else {
+      location = "";
+    }
 
     interface DroppedFile {
       name: string;
