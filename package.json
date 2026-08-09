@@ -243,11 +243,6 @@
           "group": "1_modification"
         },
         {
-          "command": "cube.openFile",
-          "when": "view == cubeExplorer && viewItem =~ /^(file|image)$/",
-          "group": "inline"
-        },
-        {
           "command": "cube.previewImage",
           "when": "view == cubeExplorer && viewItem == image",
           "group": "inline"
