@@ -2,7 +2,7 @@
   "name": "cube-oss",
   "displayName": "精弘立方存储",
   "description": "Manage your Cube OSS in your code.",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "publisher": "Shy",
   "repository": {
     "type": "git",
