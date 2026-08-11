@@ -62,7 +62,7 @@
       {
         "key": "delete",
         "command": "cube.deleteFile",
-        "when": "sideBarFocus"
+        "when": "focusedView == 'cubeExplorer'"
       }
     ],
     "viewsContainers": {
