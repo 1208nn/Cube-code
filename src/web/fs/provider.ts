@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { ApiError, CubeClient, FileMeta } from "./api";
+import { ApiError, CubeClient, FileMeta } from "../api";
 
 interface ParsedUri {
   bucket: string;

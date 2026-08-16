@@ -7,7 +7,7 @@ import {
   syncToggleContextKeys,
 } from "./state";
 import { CubeNode, nodeKey, nodeUri } from "./tree";
-import { CubeTreeProvider } from "./treeProvider";
+import { CubeTreeProvider } from "./tree";
 import { uploadFiles } from "./upload";
 
 type CommandFn = (...args: any[]) => unknown;

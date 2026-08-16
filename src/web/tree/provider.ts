@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
-import { CubeClient, FileMeta } from "./api";
-import { CubeNode, formatSize, nodeUri } from "./tree";
+import { CubeClient, FileMeta } from "../api";
+import { CubeNode, formatSize, nodeUri } from "./types";
 
 export class CubeTreeProvider implements vscode.TreeDataProvider<CubeNode> {
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<

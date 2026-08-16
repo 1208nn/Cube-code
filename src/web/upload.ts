@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { CubeClient } from "./api";
-import { CubeTreeProvider } from "./treeProvider";
+import { CubeTreeProvider } from "./tree";
 
 /** Read upload preferences from workspace configuration. */
 export function getPrefs(): { convertWebp: boolean; useUuid: boolean } {

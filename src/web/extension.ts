@@ -1,15 +1,14 @@
 import * as vscode from "vscode";
 import { CubeClient } from "./api";
 import { registerCommands } from "./commands";
-import { CubeFileSystemProvider } from "./fsProvider";
+import { CubeFileSystemProvider } from "./fs/provider";
 import {
   getApiKey,
   getApiUrl,
   syncToggleContextKeys,
   updateContextKeys,
 } from "./state";
-import { CubeDragDropController } from "./dragDrop";
-import { CubeTreeProvider } from "./treeProvider";
+import { CubeDragDropController, CubeTreeProvider } from "./tree";
 
 export async function activate(
   context: vscode.ExtensionContext,

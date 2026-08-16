@@ -1,8 +1,8 @@
 import * as vscode from "vscode";
-import { CubeClient } from "./api";
-import { CubeNode, nodeKey, nodeUri } from "./tree";
-import { CubeTreeProvider } from "./treeProvider";
-import { getPrefs, webpConvertibleRegex } from "./upload";
+import { CubeClient } from "../api";
+import { getPrefs, webpConvertibleRegex } from "../upload";
+import { CubeNode, nodeKey, nodeUri } from "./types";
+import { CubeTreeProvider } from "./provider";
 
 /** A file item to be uploaded via drag-and-drop. */
 interface DroppedFile {
