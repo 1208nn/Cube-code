@@ -21,7 +21,17 @@ export class CubeTreeProvider implements vscode.TreeDataProvider<CubeNode> {
   }
 
   invalidate(bucket: string, location: string): void {
+    // Clear the target location and every ancestor up to the bucket root so
+    // that parent directories also re-fetch their children list — otherwise a
+    // stale parent cache hides the newly uploaded file in the tree view.
     this.cache.delete(`${bucket}::${location}`);
+    let ancestor = location;
+    while (ancestor.includes("/")) {
+      ancestor = ancestor.slice(0, ancestor.lastIndexOf("/"));
+      this.cache.delete(`${bucket}::${ancestor}`);
+    }
+    // Always clear the bucket-root cache too.
+    this.cache.delete(`${bucket}::`);
     this._onDidChangeTreeData.fire();
   }
 
