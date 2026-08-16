@@ -8,7 +8,8 @@ import {
   syncToggleContextKeys,
   updateContextKeys,
 } from "./state";
-import { CubeDragDropController, CubeTreeProvider } from "./tree";
+import { CubeDragDropController } from "./dragDrop";
+import { CubeTreeProvider } from "./treeProvider";
 
 export async function activate(
   context: vscode.ExtensionContext,

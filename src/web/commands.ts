@@ -6,7 +6,9 @@ import {
   setApiKey,
   syncToggleContextKeys,
 } from "./state";
-import { CubeNode, CubeTreeProvider, nodeKey, nodeUri } from "./tree";
+import { CubeNode, nodeKey, nodeUri } from "./tree";
+import { CubeTreeProvider } from "./treeProvider";
+import { uploadFiles } from "./upload";
 
 type CommandFn = (...args: any[]) => unknown;
 
@@ -64,35 +66,6 @@ function selectedFiles(
   return raw.filter(
     (n): n is Extract<CubeNode, { kind: "file" }> => n.kind === "file",
   );
-}
-
-function getPrefs(): { convertWebp: boolean; useUuid: boolean } {
-  const cfg = vscode.workspace.getConfiguration("cube-oss");
-  return {
-    convertWebp: cfg.get<boolean>("convertWebp", true),
-    useUuid: cfg.get<boolean>("useUuid", false),
-  };
-}
-
-/** Build a case-insensitive regex from the configurable `cube-oss.webpConvertible` list. */
-function webpConvertibleRegex(): RegExp {
-  const exts = vscode.workspace
-    .getConfiguration("cube-oss")
-    .get<string[]>("webpConvertible") ?? [
-    ".jpg",
-    ".jpeg",
-    ".png",
-    ".gif",
-    ".tif",
-    ".tiff",
-    ".bmp",
-  ];
-  const parts = exts.map((e) => {
-    const ext = e.trim().toLowerCase();
-    const dotted = ext.startsWith(".") ? ext : "." + ext;
-    return dotted.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  });
-  return new RegExp(`(${parts.join("|")})$`, "i");
 }
 
 export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
@@ -185,38 +158,11 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
   };
 
   /** Upload local files into bucket/location with progress. */
-  const uploadFiles = async (
+  const uploadFilesLocal = async (
     bucket: string,
     location: string,
     uris: vscode.Uri[],
-  ): Promise<void> => {
-    await vscode.window.withProgress(
-      {
-        location: vscode.ProgressLocation.Notification,
-        title: `Cube: uploading to ${bucket}${location ? "/" + location : ""}`,
-        cancellable: false,
-      },
-      async (progress) => {
-        const step = 100 / uris.length;
-        const { convertWebp, useUuid } = getPrefs();
-        const regex = webpConvertibleRegex();
-        for (const uri of uris) {
-          const name = uri.path.split("/").pop() ?? "file";
-          progress.report({ message: name });
-          const data = await vscode.workspace.fs.readFile(uri);
-          await client.upload(bucket, location, name, data, {
-            convertWebp: convertWebp && regex.test(name),
-            useUuid,
-          });
-          progress.report({ increment: step });
-        }
-      },
-    );
-    tree.invalidate(bucket, location);
-    await vscode.window.showInformationMessage(
-      `Cube：已上传 ${uris.length} 个文件到 ${bucket}${location ? "/" + location : ""}。`,
-    );
-  };
+  ): Promise<void> => uploadFiles(client, tree, bucket, location, uris);
 
   const pickLocalFiles = (title: string) =>
     vscode.window.showOpenDialog({
@@ -299,7 +245,7 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
       if (!uris?.length) {
         return;
       }
-      await uploadFiles(bucket, location, uris);
+      await uploadFilesLocal(bucket, location, uris);
     }),
 
     // Folders materialize on upload (backend has no explicit mkdir): the command
@@ -332,7 +278,7 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
       if (!uris?.length) {
         return;
       }
-      await uploadFiles(bucket, location, uris);
+      await uploadFilesLocal(bucket, location, uris);
     }),
 
     reg(
