@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { CubeClient, FileMeta } from "./api";
+import { FileMeta } from "./api";
 
 export type CubeNode =
   | { kind: "bucket"; bucket: string }
