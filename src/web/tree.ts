@@ -1,6 +1,36 @@
 import * as vscode from "vscode";
 import { CubeClient, FileMeta } from "./api";
 
+/** Read upload preferences from workspace configuration. */
+function getPrefs(): { convertWebp: boolean; useUuid: boolean } {
+  const cfg = vscode.workspace.getConfiguration("cube-oss");
+  return {
+    convertWebp: cfg.get<boolean>("convertWebp", true),
+    useUuid: cfg.get<boolean>("useUuid", false),
+  };
+}
+
+/** Build a case-insensitive regex for formats that can be converted to WebP. */
+function webpConvertibleRegex(): RegExp {
+  const exts = vscode.workspace
+    .getConfiguration("cube-oss")
+    .get<string[]>("webpConvertible") ?? [
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".tif",
+    ".tiff",
+    ".bmp",
+  ];
+  const parts = exts.map((e) => {
+    const ext = e.trim().toLowerCase();
+    const dotted = ext.startsWith(".") ? ext : "." + ext;
+    return dotted.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  });
+  return new RegExp(`(${parts.join("|")})$`, "i");
+}
+
 export type CubeNode =
   | { kind: "bucket"; bucket: string }
   | { kind: "dir"; bucket: string; path: string }
@@ -208,6 +238,9 @@ export class CubeDragDropController implements vscode.TreeDragAndDropController<
     }
 
     const files: DroppedFile[] = [];
+    // Track names already collected via uri-list so the browser-File loop
+    // below doesn't re-add duplicates when both sources carry the same items.
+    const seenNames = new Set<string>();
 
     // From VS Code Explorer / desktop (uri-list)
     const uriItem = dataTransfer.get("text/uri-list");
@@ -220,18 +253,30 @@ export class CubeDragDropController implements vscode.TreeDragAndDropController<
         }
         const uri = vscode.Uri.parse(trimmed);
         if (uri.scheme === "file" || uri.scheme === "vscode-remote") {
+          const name = uri.path.split("/").pop() ?? "file";
+          seenNames.add(name);
           files.push({
-            name: uri.path.split("/").pop() ?? "file",
+            name,
             read: async () => vscode.workspace.fs.readFile(uri),
           });
         }
       }
     }
 
-    // From OS into a web extension host (browser File objects)
-    for (const [, item] of dataTransfer) {
+    // From OS into a web extension host (browser File objects).
+    // Skip mime types that are not actual file payloads to avoid treating
+    // the uri-list string itself as a file.
+    const skipMimes = new Set([
+      "text/uri-list",
+      CubeDragDropController.TREE_MIME,
+    ]);
+    for (const [mime, item] of dataTransfer) {
+      if (skipMimes.has(mime)) {
+        continue;
+      }
       const file = item.asFile();
-      if (file) {
+      if (file && !seenNames.has(file.name)) {
+        seenNames.add(file.name);
         files.push({ name: file.name, read: async () => file.data() });
       }
     }
@@ -239,6 +284,9 @@ export class CubeDragDropController implements vscode.TreeDragAndDropController<
     if (!files.length) {
       return;
     }
+
+    const { convertWebp, useUuid } = getPrefs();
+    const webpRegex = webpConvertibleRegex();
 
     await vscode.window.withProgress(
       {
@@ -257,8 +305,8 @@ export class CubeDragDropController implements vscode.TreeDragAndDropController<
           });
           const data = await file.read();
           await this.client.upload(bucket, location, file.name, data, {
-            convertWebp: false,
-            useUuid: false,
+            convertWebp: convertWebp && webpRegex.test(file.name),
+            useUuid,
           });
         }
       },
