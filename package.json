@@ -63,6 +63,11 @@
         "key": "delete",
         "command": "cube.deleteFile",
         "when": "focusedView == 'cubeExplorer'"
+      },
+      {
+        "key": "f2",
+        "command": "cube.renameFile",
+        "when": "focusedView == 'cubeExplorer'"
       }
     ],
     "viewsContainers": {
@@ -155,6 +160,12 @@
         "title": "下载",
         "category": "Cube",
         "icon": "$(cloud-download)"
+      },
+      {
+        "command": "cube.renameFile",
+        "title": "重命名",
+        "category": "Cube",
+        "icon": "$(edit)"
       },
       {
         "command": "cube.deleteFile",
@@ -256,6 +267,11 @@
         },
         {
           "command": "cube.downloadFile",
+          "when": "view == cubeExplorer && viewItem =~ /^(file|image)$/",
+          "group": "2_action"
+        },
+        {
+          "command": "cube.renameFile",
           "when": "view == cubeExplorer && viewItem =~ /^(file|image)$/",
           "group": "2_action"
         },

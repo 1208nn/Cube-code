@@ -353,6 +353,69 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
     ),
 
     reg(
+      "cube.renameFile",
+      async (node: CubeNode, nodes?: readonly CubeNode[]) => {
+        const targets = selectedFileNodes(node, nodes);
+        if (targets.length !== 1) {
+          await vscode.window.showWarningMessage("请选择单个文件进行重命名。");
+          return;
+        }
+        const t = targets[0];
+        const oldKey = nodeKey(t);
+        const oldName = t.meta.name;
+        const location = oldKey.includes("/")
+          ? oldKey.slice(0, oldKey.lastIndexOf("/"))
+          : "";
+
+        const newName = await vscode.window.showInputBox({
+          title: "Cube：重命名",
+          value: oldName,
+          prompt: "输入新的文件名",
+          validateInput: (v) => {
+            if (!v.trim()) {
+              return "文件名不能为空";
+            }
+            if (/[/\\]/.test(v)) {
+              return "文件名不能包含 / 或 \\";
+            }
+            if (v.trim() === oldName) {
+              return "文件名未改变";
+            }
+            return undefined;
+          },
+        });
+
+        if (!newName) {
+          return;
+        }
+
+        const trimmedNewName = newName.trim();
+
+        await vscode.window.withProgress(
+          {
+            location: vscode.ProgressLocation.Notification,
+            title: `Cube：正在重命名 ${oldName} 为 ${trimmedNewName}`,
+            cancellable: false,
+          },
+          async () => {
+            const data = await client.download(t.bucket, oldKey);
+            await client.upload(t.bucket, location, trimmedNewName, data, {
+              convertWebp: false,
+              useUuid: false,
+            });
+            await client.delete(t.bucket, oldKey);
+          },
+        );
+
+        tree.invalidate(t.bucket, location);
+        await closeDeletedTabs([t]);
+        await vscode.window.showInformationMessage(
+          `Cube：已重命名 ${oldName} 为 ${trimmedNewName}。`,
+        );
+      },
+    ),
+
+    reg(
       "cube.deleteFile",
       async (node: CubeNode, nodes?: readonly CubeNode[]) => {
         const targets = selectedFileNodes(node, nodes);
